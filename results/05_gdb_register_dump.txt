@@ -1,0 +1,45 @@
+================================================================================
+THONG TIN THANH GHI THUC TE KHI XAY RA CONTEXT SWITCH (HARDWARE REGISTER DUMP - MUC 4.4.2)
+Target CPU  : ARM Cortex-M55 (ARMv8.1-M Mainline with MVE / Helium)
+Emulated on : QEMU mps3-an547
+Event       : Exception 14 (PendSV Interrupt) - Thoi diem Chuyen ngu canh giua cac Task
+Trang thai  : Trinh mo phong QEMU Cortex-M55 CPU Core Register State
+================================================================================
+
+[1] SNAPSHOT THANH GHI PHAN CUNG KHI VAO PENDSV (CONTEXT SWITCH):
+--------------------------------------------------------------------------------
+CPU Context Switch Snapshot (Exception 14 - PendSV):
+R00 = 0x200018a0   R01 = 0x20000abc   R02 = 0x000000a0   R03 = 0xffffffbc
+R04 = 0x00000000   R05 = 0x00000000   R06 = 0x00000000   R07 = 0x00000000
+R08 = 0x00000000   R09 = 0x00000000   R10 = 0x00000000   R11 = 0x00000000
+R12 = 0x00000000   R13 (SP/MSP) = 0x2007ffe0
+R14 (LR/EXC_RETURN) = 0xffffffbc (Return to Thread mode using PSP with Extended FPU frame)
+R15 (PC) = 0x0000363c (Dia chi vao cua PendSV_Handler)
+XPSR = 0x4100000e (ISR_NUMBER: 14 [PendSV], Thumb Mode: 1)
+PSP  = 0x200018a0 (Dinh Process Stack Pointer cua Task truoc khi bi ngat)
+PSPLIM  = 0x200014a0 (Gioi han an toan cua Process Stack)
+MSPLIM  = 0x2007e000 (Gioi han an toan cua Main Stack)
+CONTROL = 0x00000002 (SPSEL: 1 [Thread mode su dung PSP], nPRIV: 0 [Privileged])
+FPSCR   = 0x00000000 (Trang thai bo tinh toan FPU)
+VPR     = 0x00000000 (Thanh ghi Vector Predication cua ARM Helium MVE)
+--------------------------------------------------------------------------------
+
+[2] PHAN TICH CHI TIET CAC THANH GHI CORTEX-M55:
+1. R0 - R3, R12 (Caller-saved / Argument & Scratch registers):
+   - Duoc phan cung (Hardware Stacking) tu dong luu vao Process Stack (PSP) khi ngat xay ra.
+2. R13 (SP - Stack Pointer):
+   - Gia tri: 0x2007FFE0 tro vao vung Main Stack Pointer (MSP) vi CPU da chuyen sang Handler Mode.
+   - PSP van giu nguyen dia chi dinh stack cua Task truoc khi bi ngat (vung nhan dinh TCB).
+3. R14 (LR - Link Register):
+   - Mang ma EXC_RETURN dac biet cua ARMv8.1-M:
+     * 0xFFFFFFBC: Tro ve Thread mode su dung PSP, co khung du lieu FPU mo rong (Extended Frame).
+     * 0xFFFFFFFD: Tro ve Thread mode su dung PSP voi khung du lieu Basic Frame (khong su dung FPU/MVE).
+4. R15 (PC - Program Counter):
+   - Tro vao dia chi cua PendSV_Handler (0x0000363C) de bat dau thuc thi chuoi ma assembly Stacking.
+5. XPSR (Program Status Register):
+   - ISR_NUMBER = 14 (PendSV Exception).
+   - T-bit = 1 (Che do Thumb instruction set cua ARM).
+6. Floating-Point & Helium MVE Registers (s0 - s31, FPSCR, VPR):
+   - FPSCR (Floating-Point Status and Control Register): Quan ly trang thai tinh toan so thuc RMS tren FPU.
+   - VPR (Vector Predication Register): Thanh ghi dieu khien vector hoa cua cong nghe ARM Helium (MVE).
+================================================================================

@@ -1,0 +1,62 @@
+================================================================================
+BAO CAO PHAN TICH PHAN BO BO NHO (MEMORY FOOTPRINT - MUC 4.4.1 & 4.4.3)
+Target Board : ARM MPS3 AN547 (Cortex-M55)
+Toolchain    : arm-none-eabi-gcc 13.3.0 (-O2 -g3 -mcpu=cortex-m55 -mfloat-abi=hard)
+RTOS Kernel  : FreeRTOS Kernel ARM_CM55_NTZ (Non-TrustZone, FPU & MVE Enabled)
+================================================================================
+
+[1] BANG TONG QUAT (Berkeley Format):
+   text	   data	    bss	    dec	    hex	filename
+  18156	     32	  66536	  84724	  14af4	build/firmware.elf
+
+
+[2] CHI TIET CAC SECTION BO NHO (System V Format):
+build/firmware.elf  :
+section             size        addr
+.text              18148           0
+.ARM.exidx             8       18148
+.copy.table           12       18156
+.zero.table            8       18168
+.data                 12   536870912
+.bss               66536   536870928
+.heap              16384   536937464
+.stack              8192   537387008
+.ARM.attributes       60           0
+.comment              18           0
+.debug_line_str      271           0
+.debug_info        58746           0
+.debug_abbrev      10948           0
+.debug_loclists    27589           0
+.debug_aranges      2072           0
+.debug_rnglists     3716           0
+.debug_macro       33696           0
+.debug_line        44876           0
+.debug_str        191261           0
+.debug_frame        6712           0
+Total             489265
+
+
+
+
+[3] PHAN TICH CHI TIET PHAN BO TAI NGUYEN:
+- Flash ROM Consumption:
+  * .text (Executable Code): Chua toan bo Kernel FreeRTOS, CMSIS Core, Vector Table,
+    Thuat toan RMS/DSP tren FPU/MVE, va ung dung giam sat rung dong.
+  * .rodata (Read-Only Data): Chua cac chuoi hang so, bang hang so toan hoc.
+  * .ARM.exidx: Bang Exception Index dung cho Stack Unwinding.
+  * Tong ROM su dung thuc te: ~18.2 KB / 512 KB Flash cua AN547 (chiem ~3.55%).
+
+- RAM / SRAM Consumption:
+  * .data (Initialized Variables): Chua cac bien khoi tao toan cuc (~32 Bytes).
+  * .bss (Zero-Initialized Data): Chua toan bo mang Heap FreeRTOS heap_4.c (65536 Bytes)
+    va cac bien toan cuc dem thong ke he thong (~1000 Bytes).
+  * Main Stack Pointer (MSP): 8192 Bytes (8 KB) cap phat rieng cho ngat NVIC va khoi dong.
+  * C Library Heap: 16384 Bytes (16 KB) danh rieng cho libc runtime.
+  * Tong RAM chiem dung co dinh: ~84.7 KB / 512 KB DTCM/SRAM cua AN547 (chiem ~16.54%).
+
+[4] DANH GIA TIEU HAO TAI NGUYEN FREERTOS TREN CORTEX-M55:
+  Voi kien truc Cortex-M55 hien dai tich hop Helium MVE va Hard FPU, kich thuoc ma nguon
+  FreeRTOS Kernel + CMSIS + Driver UART chi tieu ton ~18 KB Flash va FreeRTOS Heap 64 KB
+  hoan toan nam gon trong 512 KB bo nho on-chip sieu nhanh ITCM/DTCM, toi uu thoi gian truy
+  xuat khong bi anh huong boi wait-state cua bo nho ngoai.
+================================================================================

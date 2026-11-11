@@ -1,0 +1,12 @@
+# Build artifacts
+build/
+*.o
+*.elf
+*.bin
+*.map
+
+# Logs & temp files
+*.log
+__pycache__/
+.vscode/
+.idea/

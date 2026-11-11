@@ -1,0 +1,125 @@
+================================================================================
+PHAN TICH CHI PHI CHUYEN NGU CANH (CONTEXT SWITCH ANALYSIS - MUC 4.4.2)
+Target CPU  : ARM Cortex-M55 (ARMv8.1-M Mainline with MVE / Helium)
+Handler     : PendSV_Handler & SysTick_Handler
+File nguon  : freertos_kernel/portable/GCC/ARM_CM55_NTZ/non_secure/portasm.c
+================================================================================
+
+[1] PHAN TICH CO CHE CHUYEN NGU CANH CUA CORTEX-M55:
+Tren kien truc ARMv8.1-M (Cortex-M55) co FPU va Vector Extension (Helium MVE):
+Moi khi xay ra Context Switch qua ngat PendSV:
+1. Hardware Context Stacking (Phan cung tu dong thuc hien khi vao ngat):
+   - Luu 8 thanh ghi co ban: r0, r1, r2, r3, r12, LR, PC, xPSR len Process Stack (PSP).
+   - Neu task su dung FPU hoac MVE (FPU active): Tu dong luu them 16 thanh ghi don
+     s0-s15 + FPSCR + 1 tu can le (Padding) = 18 words (72 bytes).
+2. Software Context Stacking (PendSV_Handler thuc hien):
+   - Luu tiep 8 thanh ghi da dung con lai: r4-r11.
+   - Luu cac thanh ghi dac thu he thong ARMv8.1-M: PSPLIM (Stack Limit), CONTROL, EXC_RETURN.
+   - Neu task su dung FPU/MVE: Dung lenh 'vstmia' / 'vstmdb' de luu 16 thanh ghi FPU/MVE con lai: s16-s31.
+   - Luu dinh stack moi (PSP) vao o dau tien cua TCB (pxCurrentTCB).
+3. Switch Context (vTaskSwitchContext):
+   - Thuat toan Port-Optimised Task Selection su dung lenh 'clz' (Count Leading Zeros) de tim task
+     Ready co do uu tien cao nhat voi do phuc tap O(1).
+4. Restore Context:
+   - Cap nhat PSP tu TCB cua Task moi.
+   - Khuc phuc s16-s31 (neu co), r4-r11, PSPLIM, CONTROL.
+   - Nhanh ve thong qua EXC_RETURN (0xffffffbc hoac 0xfffffffd) de Hardware tu dong khoi phuc
+     r0-r3, r12, LR, PC, xPSR va s0-s15.
+
+Tong so thanh ghi can quan ly trong 1 lan Context Switch day du FPU/MVE la:
+8 (Core auto) + 8 (Core asm) + 32 (FPU s0-s31) + 1 (FPSCR) + 4 (System) = 53 thanh ghi (212 bytes)!
+
+[2] THONG KE SO CAU LENH TRONG PendSV_Handler:
+    - Tong so cau lenh Assembly thuc thi trong PendSV_Handler: 28 cau lenh.
+    - Uoc tinh so chu ky CPU (Cycles):
+      * Thao tac Stacking/Unstacking (Load/Store multiple qua DTCM 0-wait state): ~35-45 cycles.
+      * Thoi gian thuc thi vTaskSwitchContext (O(1) voi CLZ): ~15-20 cycles.
+      * Tong chi phi chuyen ngu canh uoc tinh: ~60 - 80 CPU cycles (chi mat ~2.4 - 3.2 micro giay tai 25 MHz).
+
+[3] DISASSEMBLY CHI TIET CUA PendSV_Handler:
+--------------------------------------------------------------------------------
+0000363c <PendSV_Handler>:
+
+#else /* configENABLE_MPU */
+
+    void PendSV_Handler( void ) /* __attribute__ (( naked )) PRIVILEGED_FUNCTION */
+    {
+        __asm volatile
+    363c:	f3ef 8009 	mrs	r0, PSP
+    3640:	f01e 0f10 	tst.w	lr, #16
+    3644:	bf08      	it	eq
+    3646:	ed20 8a10 	vstmdbeq	r0!, {s16-s31}
+    364a:	f3ef 820b 	mrs	r2, PSPLIM
+    364e:	4673      	mov	r3, lr
+    3650:	e920 0ffc 	stmdb	r0!, {r2, r3, r4, r5, r6, r7, r8, r9, sl, fp}
+    3654:	4a0f      	ldr	r2, [pc, #60]	@ (3694 <PendSV_Handler+0x58>)
+    3656:	6811      	ldr	r1, [r2, #0]
+    3658:	6008      	str	r0, [r1, #0]
+    365a:	f04f 00a0 	mov.w	r0, #160	@ 0xa0
+    365e:	f380 8811 	msr	BASEPRI, r0
+    3662:	f3bf 8f4f 	dsb	sy
+    3666:	f3bf 8f6f 	isb	sy
+    366a:	f7fe fbdf 	bl	1e2c <vTaskSwitchContext>
+    366e:	f04f 0000 	mov.w	r0, #0
+    3672:	f380 8811 	msr	BASEPRI, r0
+    3676:	4a07      	ldr	r2, [pc, #28]	@ (3694 <PendSV_Handler+0x58>)
+    3678:	6811      	ldr	r1, [r2, #0]
+    367a:	6808      	ldr	r0, [r1, #0]
+    367c:	e8b0 0ffc 	ldmia.w	r0!, {r2, r3, r4, r5, r6, r7, r8, r9, sl, fp}
+    3680:	f013 0f10 	tst.w	r3, #16
+    3684:	bf08      	it	eq
+    3686:	ecb0 8a10 	vldmiaeq	r0!, {s16-s31}
+    368a:	f382 880b 	msr	PSPLIM, r2
+    368e:	f380 8809 	msr	PSP, r0
+    3692:	4718      	bx	r3
+        #else /* #if ( configNUMBER_OF_CORES > 1 ) */
+            :: "i" ( configMAX_SYSCALL_INTERRUPT_PRIORITY )
+        #endif /* #if ( configNUMBER_OF_CORES > 1 ) */
+
+        );
+    }
+    3694:	20000154 	.word	0x20000154
+
+
+[4] DISASSEMBLY CHI TIET CUA SysTick_Handler:
+--------------------------------------------------------------------------------
+000033c0 <SysTick_Handler>:
+#endif /* configNUMBER_OF_CORES == 1 */
+/*-----------------------------------------------------------*/
+
+void SysTick_Handler( void ) /* PRIVILEGED_FUNCTION */
+{
+    33c0:	b510      	push	{r4, lr}
+    uint32_t ulPreviousMask;
+
+    ulPreviousMask = portSET_INTERRUPT_MASK_FROM_ISR();
+    33c2:	f000 f927 	bl	3614 <ulSetInterruptMask>
+    33c6:	4604      	mov	r4, r0
+    #endif /* if ( configNUMBER_OF_CORES > 1 ) */
+
+    traceISR_ENTER();
+    {
+        /* Increment the RTOS tick. */
+        if( xTaskIncrementTick() != pdFALSE )
+    33c8:	f7fe fd20 	bl	1e0c <xTaskIncrementTick>
+    33cc:	b128      	cbz	r0, 33da <SysTick_Handler+0x1a>
+        {
+            traceISR_EXIT_TO_SCHEDULER();
+            /* Pend a context switch. */
+            portNVIC_INT_CTRL_REG = portNVIC_PENDSVSET_BIT;
+    33ce:	f04f 23e0 	mov.w	r3, #3758153728	@ 0xe000e000
+    33d2:	f04f 5280 	mov.w	r2, #268435456	@ 0x10000000
+    33d6:	f8c3 2d04 	str.w	r2, [r3, #3332]	@ 0xd04
+    }
+    #if ( configNUMBER_OF_CORES > 1 )
+        portEXIT_CRITICAL_FROM_ISR( uxSavedInterruptStatus );
+    #endif /* if ( configNUMBER_OF_CORES > 1 ) */
+
+    portCLEAR_INTERRUPT_MASK_FROM_ISR( ulPreviousMask );
+    33da:	4620      	mov	r0, r4
+}
+    33dc:	e8bd 4010 	ldmia.w	sp!, {r4, lr}
+    portCLEAR_INTERRUPT_MASK_FROM_ISR( ulPreviousMask );
+    33e0:	f000 b924 	b.w	362c <vClearInterruptMask>
+
+================================================================================

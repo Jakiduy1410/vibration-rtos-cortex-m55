@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Giám Sát Rung Động FreeRTOS (ARM Cortex-M55) - Academic Dashboard</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-p4: #ef4444;
+            --accent-p3: #3b82f6;
+            --accent-p2: #10b981;
+            --accent-p1: #f59e0b;
+            --border: #334155;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background: var(--bg); color: var(--text-main); padding: 24px; line-height: 1.5; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; }
+        .title h1 { font-size: 22px; font-weight: 700; color: #38bdf8; }
+        .title p { font-size: 13px; color: var(--text-muted); }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .kpi-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; position: relative; overflow: hidden; }
+        .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #38bdf8; }
+        .kpi-val { font-size: 26px; font-weight: 700; margin: 6px 0; color: #fff; }
+        .kpi-lbl { font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+        .kpi-sub { font-size: 11px; color: #38bdf8; }
+
+        .section { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 24px; }
+        .section-title { font-size: 16px; font-weight: 700; color: #f1f5f9; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .section-title span { background: #38bdf8; color: #0f172a; border-radius: 4px; padding: 2px 8px; font-size: 11px; }
+
+        /* Timeline waveform container */
+        .timeline-scroll { overflow-x: auto; background: #090d16; border: 1px solid #1e293b; border-radius: 6px; padding: 16px 10px; margin-bottom: 12px; }
+        .track-label { width: 140px; font-size: 11px; font-weight: 700; display: inline-block; vertical-align: middle; }
+        .track-row { margin-bottom: 12px; display: flex; align-items: center; }
+        .waveform { position: relative; height: 26px; background: #131c2e; flex-grow: 1; border-radius: 4px; border: 1px solid #1e293b; }
+        .pulse { position: absolute; height: 100%; border-radius: 3px; cursor: pointer; transition: transform 0.1s; }
+        .pulse:hover { filter: brightness(1.3); transform: scaleY(1.15); z-index: 10; }
+        .p4 { background: var(--accent-p4); }
+        .p3 { background: var(--accent-p3); }
+        .p2 { background: var(--accent-p2); }
+        .p1 { background: var(--accent-p1); }
+
+        .time-axis { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); padding-left: 140px; font-family: monospace; }
+        .tooltip-info { background: #1e293b; border: 1px solid #38bdf8; border-radius: 6px; padding: 12px; font-size: 12px; margin-top: 10px; display: none; }
+
+        .figure-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .figure-box { background: #0b1120; border: 1px solid var(--border); border-radius: 6px; padding: 12px; text-align: center; }
+        .figure-box img { max-width: 100%; height: auto; border-radius: 4px; cursor: pointer; }
+        .figure-caption { font-size: 12px; color: var(--text-muted); margin-top: 8px; font-weight: 500; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: #131d31; color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 11px; }
+        .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; color: #fff; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="title">
+            <h1>HỆ THỐNG GIÁM SÁT RUNG ĐỘNG & BÁO ĐỘNG THỜI GIAN THỰC</h1>
+            <p>Kiến trúc: ARM Cortex-M55 (ARMv8.1-M Mainline + Helium MVE + FPU Hard-Float) | FreeRTOS Kernel Non-TrustZone trên QEMU mps3-an547</p>
+        </div>
+        <div>
+            <span style="background: #10b981; color:#0f172a; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold;">
+                Status: SIMULATION COMPLETED
+            </span>
+        </div>
+    </div>
+
+    <!-- KPI Metrics -->
+    <div class="kpi-grid">
+        <div class="kpi-card" style="--accent: #ef4444;">
+            <div class="kpi-lbl">Preemption Latency</div>
+            <div class="kpi-val" style="color:#ef4444;">0 tick <span style="font-size:14px; font-weight:normal;">(~2.8 μs)</span></div>
+            <div class="kpi-sub">Task_Alarm (P4) preempt Task_Process (P2) ngay tại T0=1200ms</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-lbl">Context Switch Cost</div>
+            <div class="kpi-val" style="color:#38bdf8;">28 Lệnh ASM</div>
+            <div class="kpi-sub">53 Thanh ghi FPU/MVE/Core lưu trong PendSV_Handler</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-lbl">Peak Memory Flash</div>
+            <div class="kpi-val" style="color:#10b981;">18.1 KB</div>
+            <div class="kpi-sub">Chỉ chiếm 3.55% tổng 512 KB Flash của mps3-an547</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-lbl">FreeRTOS Heap Util</div>
+            <div class="kpi-val" style="color:#f59e0b;">25.9% <span style="font-size:14px; font-weight:normal;">(16.9 KB / 64 KB)</span></div>
+            <div class="kpi-sub">Dung lượng Heap tự do còn lại: 48,552 Bytes</div>
+        </div>
+    </div>
+
+    <!-- Interactive Logic Timing Diagram -->
+    <div class="section">
+        <div class="section-title">
+            <span>FIGURE 1 INTERACTIVE</span>
+            GIẢN ĐỒ XUNG ĐỊNH THỜI VÀ TIẾN TRÌNH THỰC THI (TASK EXECUTION TIMELINE)
+        </div>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">
+            Mô phỏng 2000 ms hoạt động qua 3 giai đoạn. Rê chuột vào các xung để xem thông tin chi tiết:
+        </p>
+
+        <div class="timeline-scroll">
+            <!-- P4: Alarm -->
+            <div class="track-row">
+                <span class="track-label" style="color:var(--accent-p4);">Task_Alarm (Prio 4)</span>
+                <div class="waveform">
+                    <div class="pulse p4" style="left:22.5%; width:0.8%;" title="Alarm #1 (Tick 450ms): Phát hiện Anomaly Sample #10 (RMS=4.18g > 2.5g)"></div>
+                    <div class="pulse p4" style="left:37.5%; width:0.8%;" title="Alarm #2 (Tick 750ms): Phát hiện Anomaly Sample #16 (RMS=4.18g > 2.5g)"></div>
+                    <div class="pulse p4" style="left:60.0%; width:1.2%;" title="Alarm #3 (Tick 1200ms): PREEMPTION VERIFICATION! Preempt Process ngay lập tức tại T0=1200!"></div>
+                    <div class="pulse p4" style="left:77.0%; width:0.8%;" title="Alarm #4 (Tick 1540ms): Kịch bản Stress Test, phát hiện đỉnh RMS 4.80g"></div>
+                </div>
+            </div>
+            <!-- P3: SensorSim -->
+            <div class="track-row">
+                <span class="track-label" style="color:var(--accent-p3);">Task_Sensor (Prio 3)</span>
+                <div class="waveform">
+                    <!-- S1 pulses -->
+                    <div class="pulse p3" style="left:0%; width:0.4%;" title="Sample #1 (0ms)"></div>
+                    <div class="pulse p3" style="left:2.5%; width:0.4%;" title="Sample #2 (50ms)"></div>
+                    <div class="pulse p3" style="left:5.0%; width:0.4%;" title="Sample #3 (100ms)"></div>
+                    <div class="pulse p3" style="left:10%; width:0.4%;" title="Sample #5 (200ms)"></div>
+                    <div class="pulse p3" style="left:22.5%; width:0.4%;" title="Sample #10 (450ms - Anomaly injected!)"></div>
+                    <div class="pulse p3" style="left:37.5%; width:0.4%;" title="Sample #16 (750ms - Anomaly injected!)"></div>
+                    <div class="pulse p3" style="left:50.0%; width:0.4%;" title="Sample #20 (1000ms)"></div>
+                    <!-- S2 pulse -->
+                    <div class="pulse p3" style="left:60.0%; width:0.5%;" title="Scenario 2 Trigger (1200ms)"></div>
+                    <!-- S3 burst -->
+                    <div class="pulse p3" style="left:74.0%; width:8.0%; opacity:0.8;" title="Stress Test Burst (1480-1640ms): Bơm liên tục chu kỳ 2ms (500Hz)"></div>
+                </div>
+            </div>
+            <!-- P2: Process -->
+            <div class="track-row">
+                <span class="track-label" style="color:var(--accent-p2);">Task_Process (Prio 2)</span>
+                <div class="waveform">
+                    <div class="pulse p2" style="left:0.5%; width:1.0%;" title="Process Sample #1 (~2ms)"></div>
+                    <div class="pulse p2" style="left:3.0%; width:1.0%;" title="Process Sample #2 (~2ms)"></div>
+                    <div class="pulse p2" style="left:10.5%; width:1.0%;" title="Process Sample #5 (~2ms)"></div>
+                    <div class="pulse p2" style="left:22.7%; width:1.2%;" title="Process Sample #10: RMS 4.18g -> Trigger Alarm"></div>
+                    <div class="pulse p2" style="left:37.7%; width:1.2%;" title="Process Sample #16: RMS 4.18g -> Trigger Alarm"></div>
+                    <!-- Preemption gap in S2 -->
+                    <div class="pulse p2" style="left:60.1%; width:0.5%;" title="Process Start (Tick 1200ms) -> Bị cướp quyền bởi Alarm!"></div>
+                    <div class="pulse p2" style="left:61.2%; width:0.8%;" title="Process Tiếp tục sau khi Alarm hoàn tất (Tick 1200ms)"></div>
+                    <!-- S3 slow process -->
+                    <div class="pulse p2" style="left:74.5%; width:20.0%; opacity:0.8;" title="Stress Test Processing: Mỗi mẫu tốn 8ms -> Gây nghẽn tràn Queue (50 gói bị drop)"></div>
+                </div>
+            </div>
+            <!-- P1: Logger -->
+            <div class="track-row">
+                <span class="track-label" style="color:var(--accent-p1);">Task_Logger (Prio 1)</span>
+                <div class="waveform">
+                    <div class="pulse p1" style="left:10.1%; width:0.8%;" title="Log Tick 202ms"></div>
+                    <div class="pulse p1" style="left:20.1%; width:0.8%;" title="Log Tick 402ms"></div>
+                    <div class="pulse p1" style="left:30.1%; width:0.8%;" title="Log Tick 602ms"></div>
+                    <div class="pulse p1" style="left:40.1%; width:0.8%;" title="Log Tick 802ms"></div>
+                    <div class="pulse p1" style="left:50.1%; width:0.8%;" title="Log Tick 1002ms"></div>
+                    <div class="pulse p1" style="left:60.5%; width:0.8%;" title="Log Tick 1202ms"></div>
+                    <div class="pulse p1" style="left:70.1%; width:0.8%;" title="Log Tick 1402ms"></div>
+                    <div class="pulse p1" style="left:80.1%; width:0.8%;" title="Log Tick 1602ms (Ghi nhận Drop: 29)"></div>
+                    <div class="pulse p1" style="left:90.1%; width:0.8%;" title="Log Tick 1802ms (Ghi nhận Drop: 50)"></div>
+                </div>
+            </div>
+
+            <!-- Time markers -->
+            <div class="time-axis">
+                <span>0 ms</span>
+                <span>250 ms</span>
+                <span>500 ms</span>
+                <span>750 ms</span>
+                <span>1000 ms</span>
+                <span>1250 ms</span>
+                <span>1500 ms</span>
+                <span>1750 ms</span>
+                <span>2000 ms</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Figures Grid -->
+    <div class="section">
+        <div class="section-title">
+            <span>ACADEMIC FIGURES</span>
+            BỘ HÌNH VẼ ĐỒ THỊ CHUẨN XUẤT BẢN KHOA HỌC (IEEE PUBLICATION READY)
+        </div>
+        <div class="figure-grid">
+            <div class="figure-box">
+                <img src="figures/01_task_execution_timing_diagram.png" alt="Figure 1: Timing Diagram">
+                <div class="figure-caption">Hình 1: Giản đồ định thời thực thi (Task Execution Timeline & Zoom-in Preemption Mechanism)</div>
+            </div>
+            <div class="figure-box">
+                <img src="figures/02_vibration_signal_and_rms.png" alt="Figure 2: Vibration Signals">
+                <div class="figure-caption">Hình 2: Dạng sóng gia tốc 3 trục thời gian thực và đường ngưỡng cảnh báo RMS</div>
+            </div>
+            <div class="figure-box">
+                <img src="figures/03_stack_and_heap_footprint.png" alt="Figure 3: Memory Footprint">
+                <div class="figure-caption">Hình 3: Phân tích giới hạn an toàn Stack High Water Mark và tỉ lệ FreeRTOS Heap</div>
+            </div>
+            <div class="figure-box">
+                <img src="figures/04_cortex_m55_context_switch_stack_frame.png" alt="Figure 4: Stack Frame">
+                <div class="figure-caption">Hình 4: Cấu trúc bộ nhớ Stack Frame 53 thanh ghi khi Context Switch trên Cortex-M55</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metrology Table -->
+    <div class="section">
+        <div class="section-title">
+            <span>DATA TABLE</span>
+            BẢNG THỐNG KÊ CHI TIẾT TÀI NGUYÊN BỘ NHỚ VÀ ĐỊNH THỜI
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Tên Task / Tiến trình</th>
+                    <th>Mức ưu tiên</th>
+                    <th>Chu kỳ / Cơ chế đánh thức</th>
+                    <th>Stack Cấp phát</th>
+                    <th>Stack Đã dùng (Peak)</th>
+                    <th>Dự trữ an toàn (Free HWM)</th>
+                    <th>Độ trễ phản hồi</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong style="color:var(--accent-p4);">Task_Alarm</strong></td>
+                    <td><span class="badge p4">Priority 4</span></td>
+                    <td>Đánh thức khẩn cấp qua Binary Semaphore</td>
+                    <td>2048 B (512 words)</td>
+                    <td>172 Bytes</td>
+                    <td>1876 Bytes (91.6%)</td>
+                    <td><strong style="color:#ef4444;">0 tick (~2.8 μs)</strong></td>
+                </tr>
+                <tr>
+                    <td><strong style="color:var(--accent-p3);">Task_SensorSim</strong></td>
+                    <td><span class="badge p3">Priority 3</span></td>
+                    <td>Chu kỳ 50ms (Normal) / 2ms (Stress Test)</td>
+                    <td>2048 B (512 words)</td>
+                    <td>344 Bytes</td>
+                    <td>1704 Bytes (83.2%)</td>
+                    <td>Tiền định (vTaskDelayUntil)</td>
+                </tr>
+                <tr>
+                    <td><strong style="color:var(--accent-p2);">Task_Process</strong></td>
+                    <td><span class="badge p2">Priority 2</span></td>
+                    <td>Chờ Queue nhận mẫu gia tốc 3 trục</td>
+                    <td>4096 B (1024 words)</td>
+                    <td>336 Bytes</td>
+                    <td>3760 Bytes (91.8%)</td>
+                    <td>~2ms (Normal) / 8ms (DSP)</td>
+                </tr>
+                <tr>
+                    <td><strong style="color:var(--accent-p1);">Task_Logger</strong></td>
+                    <td><span class="badge p1">Priority 1</span></td>
+                    <td>Chu kỳ định kỳ 200ms (Mutex bảo vệ)</td>
+                    <td>4096 B (1024 words)</td>
+                    <td>128 Bytes</td>
+                    <td>3968 Bytes (96.9%)</td>
+                    <td>Chạy khi CPU rảnh</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</body>
+</html>

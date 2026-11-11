@@ -1,0 +1,168 @@
+
+
+====================================================================
+
+   HE THONG GIAM SAT RUNG DONG & CANH BAO BAT THUONG (FreeRTOS)    
+
+   Architecture: ARM Cortex-M55 (ARMv8.1-M Mainline + FPU + MVE)   
+
+   Emulated on : QEMU mps3-an547 (AN547 FPGA image)                 
+
+====================================================================
+
+[Kernel] Initial Free Heap: 65536 Bytes (64 KB)
+
+[Kernel] Free Heap after creating 4 Tasks & IPCs: 52160 Bytes
+
+[Kernel] Starting FreeRTOS Scheduler...
+
+
+
+====================================================================
+
+>>> GIAI DOAN 1: KICH BAN 1 - HOAT DONG BINH THUONG & PHAT HIEN ANOMALY
+
+    (Sampling period: 50ms / 20Hz. Injections at Sample #10 & #16)
+
+====================================================================
+
+[Process] Sample #1 Normal: RMS = 1.06g
+
+[Process] Sample #5 Normal: RMS = 1.11g
+
+[Logger Tick: 202 ms] FreeHeap: 48552 B | Gen: 5 | Proc: 5 | Drop: 0 | Alarms: 0
+
+[Process] Sample #9 Normal: RMS = 1.02g
+
+[Logger Tick: 402 ms] FreeHeap: 48552 B | Gen: 9 | Proc: 9 | Drop: 0 | Alarms: 0
+
+[Process] Sample #10 ANOMALY DETECTED! RMS = 4.18g > 2.50g -> Triggering Alarm!
+
+
+
+>>> [EMERGENCY ALARM #1] Activated at Tick = 450 (Emergency Shutdown Signal Generated)
+
+
+
+[Process] Sample #13 Normal: RMS = 1.06g
+
+[Logger Tick: 602 ms] FreeHeap: 48552 B | Gen: 13 | Proc: 13 | Drop: 0 | Alarms: 1
+
+[Process] Sample #16 ANOMALY DETECTED! RMS = 4.18g > 2.50g -> Triggering Alarm!
+
+
+
+>>> [EMERGENCY ALARM #2] Activated at Tick = 750 (Emergency Shutdown Signal Generated)
+
+
+
+[Process] Sample #17 Normal: RMS = 1.11g
+
+[Logger Tick: 802 ms] FreeHeap: 48552 B | Gen: 17 | Proc: 17 | Drop: 0 | Alarms: 2
+
+[Logger Tick: 1002 ms] FreeHeap: 48552 B | Gen: 20 | Proc: 20 | Drop: 0 | Alarms: 2
+
+
+
+====================================================================
+
+>>> GIAI DOAN 2: KICH BAN 2 - KIEM CHUNG PREEMPTION VA MUTEX
+
+    (Triggering emergency alarm during computation)
+
+====================================================================
+
+[Process: Triggering Alarm at Tick T0 = 1200]
+
+[Alarm: Preempted CPU immediately at Tick T0 = 1200! Priority = 4]
+
+[Process: Resumed execution after Alarm finished at Tick = 1200]
+
+[Logger Tick: 1202 ms] FreeHeap: 48552 B | Gen: 21 | Proc: 21 | Drop: 0 | Alarms: 3
+
+[Logger Tick: 1402 ms] FreeHeap: 48552 B | Gen: 21 | Proc: 21 | Drop: 0 | Alarms: 3
+
+
+
+====================================================================
+
+>>> GIAI DOAN 3: KICH BAN 3 - STRESS TEST & RESOURCE SATURATION
+
+    (High rate 2ms / 500Hz vs Slow Processing 8ms. Queue capacity: 10)
+
+====================================================================
+
+[Process-Stress] High RMS = 4.80g detected -> Signaling Alarm!
+
+
+
+>>> [EMERGENCY ALARM #4] Activated at Tick = 1540 (Emergency Shutdown Signal Generated)
+
+
+
+[Logger Tick: 1602 ms] FreeHeap: 48552 B | Gen: 73 | Proc: 34 | Drop: 29 | Alarms: 4
+
+[Logger Tick: 1802 ms] FreeHeap: 48552 B | Gen: 101 | Proc: 51 | Drop: 50 | Alarms: 4
+
+[Logger Tick: 2002 ms] FreeHeap: 48552 B | Gen: 101 | Proc: 51 | Drop: 50 | Alarms: 4
+
+
+
+====================================================================
+
+       TONG KET SO LIEU THUC NGHIEM TOAN DIEN (SECTIONS 4.3 & 4.4)  
+
+====================================================================
+
+[1] THONG KE DULIEU VA CANH BAO:
+
+    - Tong so mau sinh ra (Generated)   : 101
+
+    - Tong so mau da xu ly (Processed)  : 51
+
+    - So goi bi rot do tran Queue (Drop): 50 (errQUEUE_FULL)
+
+    - Tong so lan canh bao (Alarms)     : 4
+
+
+
+[2] THONG KE FREERTOS HEAP (heap_4.c):
+
+    - Tong dung luong Heap cau hinh     : 65536 Bytes (64 KB)
+
+    - Heap con trong truoc khi tao Task : 65536 Bytes
+
+    - Heap con trong sau khi tao 4 Task : 52160 Bytes
+
+    - Heap con trong hien tai (Free)    : 48552 Bytes
+
+    - Heap da cap phat thuc te (Used)   : 16984 Bytes
+
+
+
+[3] BANG THEO DOI STACK HIGH WATER MARK (MUC 4.4.1):
+
+--------------------------------------------------------------------
+
+Task Name        | Prio | Alloc (Bytes) | Free HWM (Bytes) | Used (Bytes)
+
+--------------------------------------------------------------------
+
+Task_SensorSim   |  3   |  2048 (512w)  |  1704 Bytes       |  344 Bytes
+
+Task_Process     |  2   |  4096 (1024w) |  3760 Bytes       |  336 Bytes
+
+Task_Alarm       |  4   |  2048 (512w)  |  1888 Bytes       |  160 Bytes
+
+Task_Logger      |  1   |  4096 (1024w) |  3968 Bytes       |  128 Bytes
+
+--------------------------------------------------------------------
+
+Ghi chu: Free HWM la so byte stack toi thieu con du chua tung bi dung toi.
+
+====================================================================
+
+
+
+[QEMU] All 3 Scenarios completed successfully. Exiting simulation...
+
