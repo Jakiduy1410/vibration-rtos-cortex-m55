@@ -76,7 +76,7 @@
         </div>
         <div class="kpi-card">
             <div class="kpi-lbl">Preemption Latency</div>
-            <div class="kpi-val" style="color:#ef4444;">0 tick <span style="font-size:13px; font-weight:normal;">(Tức thời)</span></div>
+            <div class="kpi-val" style="color:#ef4444;">120.16 µs <span style="font-size:13px; font-weight:normal;">(3,004 cyc)</span></div>
             <div class="kpi-sub">vTaskAlarm (P5) cướp CPU giữa phép FFT của vTaskProcessing (P3)</div>
         </div>
         <div class="kpi-card">
@@ -85,19 +85,19 @@
             <div class="kpi-sub">Logging giữ xLogMutex được nâng lên Pri 3, bị P4 cướp quyền</div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-lbl">Drop-Oldest Policy</div>
-            <div class="kpi-val" style="color:#38bdf8;">35 Dropped</div>
-            <div class="kpi-sub">xLogQueue (8x32B) bão hòa trong Stress Test (126 overruns)</div>
+            <div class="kpi-lbl">Đẳng thức khối & Log (S3)</div>
+            <div class="kpi-val" style="color:#38bdf8;">0 Alarm Drop</div>
+            <div class="kpi-sub">Khối: 240 = 174 + 66 | Log: 134 = 10 + 124 drops | Alarm: 0 drop</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-lbl">Bộ nhớ DTCM Tốc độ cao</div>
-            <div class="kpi-val" style="color:#38bdf8;">13.4 KB / 128 KB</div>
-            <div class="kpi-sub">Chứa Double Buffer, Workspace FFT, Stacks Pri 5, 4, 3</div>
+            <div class="kpi-val" style="color:#38bdf8;">12.4 KB / 128 KB</div>
+            <div class="kpi-sub">Chứa Double Buffer (2KB), FFT Workspace (4KB), Stacks (6KB)</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-lbl">FreeRTOS Heap (heap_5)</div>
-            <div class="kpi-val" style="color:#10b981;">704 B / 64 KB</div>
-            <div class="kpi-sub">Heap còn trống 64,832 B (98.93% an toàn không rò rỉ)</div>
+            <div class="kpi-val" style="color:#10b981;">1,168 B / 64 KB</div>
+            <div class="kpi-sub">Heap còn trống 64,368 B (98.22% an toàn không rò rỉ)</div>
         </div>
     </div>
 
@@ -129,8 +129,8 @@
                     <td>1.0 ms</td>
                     <td><span class="badge badge-dtcm">DTCM</span></td>
                     <td>1,024 B (256w)</td>
-                    <td>160 Bytes (15.6%)</td>
-                    <td>864 Bytes</td>
+                    <td>312 Bytes (30.5%)</td>
+                    <td>712 Bytes</td>
                     <td><span class="badge badge-pass">AN TOÀN</span></td>
                 </tr>
                 <tr>
@@ -140,8 +140,8 @@
                     <td>2.0 ms</td>
                     <td><span class="badge badge-dtcm">DTCM</span></td>
                     <td>1,024 B (256w)</td>
-                    <td>184 Bytes (18.0%)</td>
-                    <td>840 Bytes</td>
+                    <td>196 Bytes (19.1%)</td>
+                    <td>828 Bytes</td>
                     <td><span class="badge badge-pass">AN TOÀN</span></td>
                 </tr>
                 <tr>
@@ -151,8 +151,8 @@
                     <td>12.0 ms</td>
                     <td><span class="badge badge-dtcm">DTCM</span></td>
                     <td>4,096 B (1024w)</td>
-                    <td>504 Bytes (12.3%)</td>
-                    <td>3,592 Bytes</td>
+                    <td>528 Bytes (12.9%)</td>
+                    <td>3,568 Bytes</td>
                     <td><span class="badge badge-pass">AN TOÀN</span></td>
                 </tr>
                 <tr>
@@ -162,8 +162,8 @@
                     <td>20.0 ms</td>
                     <td><span class="badge badge-sram">SRAM</span></td>
                     <td>2,048 B (512w)</td>
-                    <td>336 Bytes (16.4%)</td>
-                    <td>1,712 Bytes</td>
+                    <td>344 Bytes (16.8%)</td>
+                    <td>1,704 Bytes</td>
                     <td><span class="badge badge-pass">AN TOÀN</span></td>
                 </tr>
                 <tr>

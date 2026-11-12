@@ -572,6 +572,8 @@ void merge_rfft_f32(
   @return        none
 */
 
+__attribute__((weak)) void rfft_mid_stage_hook(void) {}
+
 void arm_rfft_fast_f32(
   const arm_rfft_fast_instance_f32 * S,
   float32_t * p,
@@ -592,6 +594,9 @@ void arm_rfft_fast_f32(
    {
       /* Calculation of RFFT of input */
       arm_cfft_f32( Sint, p, ifftFlag, 1);
+
+      /* Hook called mid-FFT computation between complex FFT and real split stage */
+      rfft_mid_stage_hook();
 
       /*  Real FFT extraction */
       stage_rfft_f32(S, p, pOut);

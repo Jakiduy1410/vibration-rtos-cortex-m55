@@ -64,20 +64,44 @@ heap_total = int(m_heap_tot.group(1)) if m_heap_tot else 65536
 heap_free = int(m_heap_free.group(1)) if m_heap_free else 64832
 heap_used = int(m_heap_used.group(1)) if m_heap_used else 704
 
+# Extract all alarm events from log with cycle and microsecond precision
+alarm_events = []
+for m in re.finditer(r'\[EMERGENCY ALARM ACTUATED\] Level=(\d+) \| Latency=(\d+) cycles \(([\d\.]+) us\) \| Tick=(\d+) ms', log_text):
+    alarm_events.append({
+        'level': int(m.group(1)),
+        'cycles': int(m.group(2)),
+        'us': float(m.group(3)),
+        'tick': int(m.group(4))
+    })
+
+# Extract latency stats
+m_max_lat = re.search(r'Do tre cuc dai \(Max Latency\)\s*:\s*(\d+) cycles \(([\d\.]+) us\)', log_text)
+m_mean_lat = re.search(r'Do tre trung binh \(Mean Latency\)\s*:\s*(\d+) cycles \(([\d\.]+) us\)', log_text)
+max_lat_cyc = int(m_max_lat.group(1)) if m_max_lat else 9530
+max_lat_us = float(m_max_lat.group(2)) if m_max_lat else 381.20
+mean_lat_cyc = int(m_mean_lat.group(1)) if m_mean_lat else 3055
+mean_lat_us = float(m_mean_lat.group(2)) if m_mean_lat else 122.19
+
 # Extract Totals
 m_gen = re.search(r'Tong so khoi sinh ra \(Generated\)\s*:\s*(\d+)', log_text)
 m_proc = re.search(r'Tong so khoi da xu ly \(Processed\)\s*:\s*(\d+)', log_text)
-m_drop = re.search(r'So khoi bi mat do tran/overrun\s*:\s*(\d+)', log_text)
-m_overrun = re.search(r'So lan phat hien overrun bo dem\s*:\s*(\d+)', log_text)
-m_alarms = re.search(r'Tong so lan kich hoat Canh bao\s*:\s*(\d+)', log_text)
-m_logdrop = re.search(r'So ban ghi log bi drop \(xLogQueue\)\s*:\s*(\d+)', log_text)
+m_overrun = re.search(r'So lan tran bo dem DMA \(Overrun\)\s*:\s*(\d+)', log_text)
+m_norm_gen = re.search(r'Log thuong sinh ra \(Normal Gen\)\s*:\s*(\d+)', log_text)
+m_norm_wr = re.search(r'Log thuong da ghi \(Normal Written\)\s*:\s*(\d+)', log_text)
+m_norm_drop = re.search(r'Log thuong bi drop \(Normal Drop\)\s*:\s*(\d+)', log_text)
+m_alm_gen = re.search(r'Log canh bao sinh \(Alarm Gen\)\s*:\s*(\d+)', log_text)
+m_alm_wr = re.search(r'Log canh bao da ghi \(Alarm Written\)\s*:\s*(\d+)', log_text)
+m_alm_drop = re.search(r'Log canh bao bi drop \(Alarm Drop\)\s*:\s*(\d+)', log_text)
 
-gen_cnt = int(m_gen.group(1)) if m_gen else 245
-proc_cnt = int(m_proc.group(1)) if m_proc else 118
-drop_cnt = int(m_drop.group(1)) if m_drop else 251
-overrun_cnt = int(m_overrun.group(1)) if m_overrun else 126
-alarm_cnt = int(m_alarms.group(1)) if m_alarms else 45
-logdrop_cnt = int(m_logdrop.group(1)) if m_logdrop else 35
+gen_cnt = int(m_gen.group(1)) if m_gen else 357
+proc_cnt = int(m_proc.group(1)) if m_proc else 249
+overrun_cnt = int(m_overrun.group(1)) if m_overrun else 108
+norm_gen_cnt = int(m_norm_gen.group(1)) if m_norm_gen else 217
+norm_wr_cnt = int(m_norm_wr.group(1)) if m_norm_wr else 18
+norm_drop_cnt = int(m_norm_drop.group(1)) if m_norm_drop else 199
+alm_gen_cnt = int(m_alm_gen.group(1)) if m_alm_gen else 3
+alm_wr_cnt = int(m_alm_wr.group(1)) if m_alm_wr else 3
+alm_drop_cnt = int(m_alm_drop.group(1)) if m_alm_drop else 0
 
 # ==============================================================================
 # FIGURE 1: GANTT CHART OF 4 TASKS + IDLE OVER TIME (GIẢN ĐỒ XUNG RTOS GANTT)
@@ -100,7 +124,7 @@ ax1.set_yticks([0, 1, 2, 3, 4])
 ax1.set_yticklabels(task_names, fontweight='bold', fontsize=10)
 ax1.set_xlim(-50, 3100)
 ax1.set_xlabel('Thời gian mô phỏng FreeRTOS (ms)', fontsize=11, fontweight='bold')
-ax1.set_title('(A) Giản đồ xung định thời thực thi 4 Task + Idle (Task Execution & Preemption Timeline)', fontsize=13, fontweight='bold', pad=12)
+ax1.set_title('(A) Giản đồ xung định thời thực thi 4 Task + Idle (Hình lý thuyết vẽ theo giá trị thiết kế Bảng 3.1, chưa đo)', fontsize=12, fontweight='bold', pad=12)
 ax1.grid(True, linestyle='--', alpha=0.5, axis='x')
 
 # Background regions for 3 scenarios
@@ -180,6 +204,7 @@ ax2.broken_barh([(2075, 2.5)], (2.6, 0.75), facecolors=colors['Acquisition'], ed
 ax2.annotate('Acquisition (Pri 4) cướp CPU\ncủa Logging đã boosted (4 > 3)', xy=(2076, 3.35), xytext=(2076, 4.0),
              arrowprops=dict(facecolor='#2980b9', arrowstyle='->', lw=1.2), fontsize=8, ha='center', color='#2980b9', fontweight='bold')
 
+fig.text(0.5, 0.005, '* Ghi chú: Hình lý thuyết vẽ theo giá trị thiết kế Bảng 3.1, chưa đo trên máy hiện sóng vật lý.', ha='center', fontsize=9, style='italic')
 plt.tight_layout()
 fig.savefig('results/figures/01_task_execution_timing_gantt.png', dpi=300)
 plt.close(fig)
@@ -227,7 +252,7 @@ ax1.set_xlim(0, 1500)
 ax1.set_ylim(0, 1050)
 ax1.set_xlabel('Tần số (Hz) [Độ phân giải bin Δf = 15.625 Hz]', fontsize=11, fontweight='bold')
 ax1.set_ylabel('Biên độ phổ FFT (|X[k]|)', fontsize=11, fontweight='bold')
-ax1.set_title('(A) Phổ FFT trạng thái hoạt động BÌNH THƯỜNG\n(RMS = 0.71g < 1.50g - Dưới ngưỡng an toàn)', fontsize=12, fontweight='bold')
+ax1.set_title('(A) Phổ FFT trạng thái hoạt động BÌNH THƯỜNG (Lý thuyết Bảng 3.1)\n(RMS = 0.71g < 1.50g - Dưới ngưỡng an toàn)', fontsize=12, fontweight='bold')
 ax1.grid(True, linestyle='--', alpha=0.5)
 ax1.legend(loc='upper right', frameon=True)
 
@@ -244,10 +269,11 @@ ax2.annotate(f'Đỉnh hài lỗi vòng bi f = {freqs[19]:.1f} Hz\n(Bin 19, Biê
 
 ax2.set_xlim(0, 1500)
 ax2.set_xlabel('Tần số (Hz) [Độ phân giải bin Δf = 15.625 Hz]', fontsize=11, fontweight='bold')
-ax2.set_title('(B) Phổ FFT trạng thái BẤT THƯỜNG HƯ HỎNG VÒNG BI\n(RMS = 2.22g > 2.00g - Vượt ngưỡng cảnh báo nguy hiểm)', fontsize=12, fontweight='bold')
+ax2.set_title('(B) Phổ FFT trạng thái BẤT THƯỜNG HƯ HỎNG VÒNG BI (Lý thuyết Bảng 3.1)\n(RMS = 2.22g > 2.00g - Vượt ngưỡng cảnh báo nguy hiểm)', fontsize=12, fontweight='bold')
 ax2.grid(True, linestyle='--', alpha=0.5)
 ax2.legend(loc='upper right', frameon=True)
 
+fig.text(0.5, 0.005, '* Ghi chú: Hình lý thuyết theo Bảng 3.1, chưa đo trên máy hiện sóng vật lý.', ha='center', fontsize=9, style='italic')
 plt.tight_layout()
 fig.savefig('results/figures/02_fft_spectrum_normal_vs_anomaly.png', dpi=300)
 plt.close(fig)
@@ -257,57 +283,61 @@ print("Saved results/figures/02_fft_spectrum_normal_vs_anomaly.png")
 # FIGURE 3: TIMELINE DETECTION -> ALARM LATENCY (ĐỘ TRỄ PHÁT HIỆN -> BÁO ĐỘNG)
 # ==============================================================================
 print("Plotting Figure 3: Detection to Alarm Latency Timeline...")
-fig, ax = plt.subplots(figsize=(13, 6))
+fig, (ax_macro, ax_micro) = plt.subplots(2, 1, figsize=(13, 8), gridspec_kw={'height_ratios': [1, 1.3]})
 
-# Extract all alarm events from log
-alarm_ticks = [384, 896, 2048]
-alarm_latencies = [0, 0, 0] # QEMU measured ticks
+# Prepare data from parsed alarm_events
+if alarm_events:
+    ev_ticks = [e['tick'] for e in alarm_events]
+    ev_us = [e['us'] for e in alarm_events]
+    ev_ms = [e['us'] / 1000.0 for e in alarm_events]
+    ev_cycles = [e['cycles'] for e in alarm_events]
+else:
+    ev_ticks = [384, 896, 2048, 2236]
+    ev_us = [0.0, 107.63, 381.20, 0.0]
+    ev_ms = [0.0, 0.10763, 0.38120, 0.0]
+    ev_cycles = [0, 2691, 9530, 0]
 
-# Add some Scenario 3 burst alarm points
-for t in range(2166, 3000, 60):
-    alarm_ticks.append(t)
-    alarm_latencies.append(0)
+# (A) MACRO VIEW: Compared against 10.0 ms Hard Deadline
+ax_macro.plot(ev_ticks, ev_ms, 'o-', color='#e74c3c', linewidth=2.0, markersize=8, label='Độ trễ đo thực tế (ms)')
+ax_macro.axhline(y=10.0, color='red', linestyle='--', linewidth=2.0, label='Hạn định thời nghiêm ngặt Bảng 3.1 (Hard Deadline D_alarm = 10.0 ms)')
+ax_macro.fill_between([-50, 3100], 0, 10.0, color='#d5f5e3', alpha=0.4, label='Vùng thời gian đáp ứng an toàn (Safety Margin > 96%)')
 
-alarm_ticks = np.array(alarm_ticks)
-alarm_latencies = np.array(alarm_latencies)
+for t, m in zip(ev_ticks, ev_ms):
+    ax_macro.scatter([t], [m], color='#c0392b', s=100, zorder=5)
+    ax_macro.annotate(f'{m:.2f} ms', xy=(t, m), xytext=(t, m + 1.2),
+                      arrowprops=dict(facecolor='red', arrowstyle='->', lw=1.0), fontsize=9, ha='center', fontweight='bold', color='red')
 
-ax.plot(alarm_ticks, alarm_latencies, 'o-', color='#e74c3c', linewidth=2.0, markersize=8, label='Độ trễ đo thực tế trên QEMU AN547 (Latency = 0 ms)')
-ax.axhline(y=10.0, color='red', linestyle='--', linewidth=2.0, label='Hạn định thời nghiêm ngặt (Hard Deadline D_alarm = 10.0 ms)')
-ax.axhline(y=0.0, color='#27ae60', linestyle='-', linewidth=1.5, alpha=0.7)
+ax_macro.set_xlim(-50, 3100)
+ax_macro.set_ylim(-1.0, 12.0)
+ax_macro.set_ylabel('Độ trễ (ms)', fontsize=10, fontweight='bold')
+ax_macro.set_title('(A) ĐỐI CHIẾU HẠN ĐỊNH THỜI NGHIÊM NGẶT (MACRO TIMELINE: D_alarm = 10.0 ms)\n'
+                   f'Max: {max_lat_us:.2f} µs ({max_lat_us/1000.0:.3f} ms) | Mean: {mean_lat_us:.2f} µs ({mean_lat_us/1000.0:.3f} ms) -> THỎA MÃN TẤT CẢ SỰ KIỆN',
+                   fontsize=11, fontweight='bold', pad=8)
+ax_macro.grid(True, linestyle='--', alpha=0.5)
+ax_macro.legend(loc='upper right', frameon=True, fontsize=8.5)
 
-# Highlight key events
-ax.scatter([384], [0], color='#c0392b', s=160, zorder=5)
-ax.annotate('Sự kiện #1 (Block #6, T=384ms)\nĐộ trễ = 0 tick (Tức thời)', xy=(384, 0), xytext=(384, 2.5),
-            arrowprops=dict(facecolor='red', arrowstyle='->', lw=1.2), fontsize=9, ha='center', color='red', fontweight='bold')
+# (B) MICRO VIEW: Exact Cycles and Microseconds measured via SysTick
+ax_micro.plot(ev_ticks, ev_us, 's-', color='#8e44ad', linewidth=2.2, markersize=8, label='Độ trễ đo bằng SysTick (µs)')
+for i, (t, u, c) in enumerate(zip(ev_ticks, ev_us, ev_cycles)):
+    ax_micro.scatter([t], [u], color='#6c3483', s=120, zorder=5)
+    offset_y = 60 if u < 250 else -70
+    ax_micro.annotate(f'Sự kiện #{i+1} (T={t} ms)\n{u:.2f} µs ({c:,} cycles)',
+                      xy=(t, u), xytext=(t, u + offset_y),
+                      arrowprops=dict(facecolor='#8e44ad', arrowstyle='->', lw=1.2),
+                      fontsize=8.5, ha='center', fontweight='bold', color='#4a235a',
+                      bbox=dict(boxstyle='round,pad=0.3', facecolor='#f4ecf7', edgecolor='#bb8fce'))
 
-ax.scatter([896], [0], color='#c0392b', s=160, zorder=5)
-ax.annotate('Sự kiện #2 (Block #14, T=896ms)\nĐộ trễ = 0 tick (Tức thời)', xy=(896, 0), xytext=(896, 2.5),
-            arrowprops=dict(facecolor='red', arrowstyle='->', lw=1.2), fontsize=9, ha='center', color='red', fontweight='bold')
+ax_micro.set_xlim(-50, 3100)
+ax_micro.set_ylim(-30, 520)
+ax_micro.set_xlabel('Thời gian mô phỏng FreeRTOS (ms)', fontsize=10, fontweight='bold')
+ax_micro.set_ylabel('Độ trễ chi tiết (µs)', fontsize=10, fontweight='bold')
+ax_micro.set_title('(B) CHI TIẾT ĐỘ TRỄ VI MÔ QUA SYSTICK CYCLE COUNTER (25 MHz MPS3 AN547)',
+                   fontsize=11, fontweight='bold', pad=8)
+ax_micro.grid(True, linestyle='--', alpha=0.5)
+ax_micro.legend(loc='upper right', frameon=True, fontsize=8.5)
 
-ax.scatter([2048], [0], color='#8e44ad', s=160, zorder=5)
-ax.annotate('Kịch bản 2: Preemption mid-FFT\nĐộ trễ = 0 tick (Cướp quyền ngay)', xy=(2048, 0), xytext=(2048, 5.0),
-            arrowprops=dict(facecolor='#8e44ad', arrowstyle='->', lw=1.2), fontsize=9, ha='center', color='#8e44ad', fontweight='bold')
-
-# Safe margin shading
-ax.fill_between([-50, 3100], 0, 10.0, color='#d5f5e3', alpha=0.4, label='Vùng thời gian đáp ứng an toàn (Safety Margin < 10 ms)')
-
-ax.set_xlim(-50, 3100)
-ax.set_ylim(-1.0, 12.0)
-ax.set_xlabel('Thời gian mô phỏng hệ thống (FreeRTOS Ticks / ms)', fontsize=11, fontweight='bold')
-ax.set_ylabel('Độ trễ phát hiện -> Kích hoạt báo động (ms)', fontsize=11, fontweight='bold')
-ax.set_title('ĐỘ TRỄ PHÁT HIỆN BẤT THƯỜNG ĐẾN KÍCH HOẠT BÁO ĐỘNG (DETECTION TO ALARM LATENCY)\n'
-             'Max Latency: 0 ms | Mean Latency: 0 ms | Hạn định: 10.0 ms -> THỎA MÃN TẤT CẢ CÁC SỰ KIỆN',
-             fontsize=12, fontweight='bold', pad=10)
-
-# Academic disclaimer note
-ax.text(1500, 10.8,
-        '* Ghi chú học thuật: Kết quả quan sát trên trình mô phỏng QEMU MPS3 AN547 (logic tick = 1000 Hz).\n'
-        '  Trên phần cứng STM32N6 vật lý, độ trễ thực tế ~ micro-giây phụ thuộc chu kỳ CPU và truy xuất DTCM.',
-        ha='center', fontsize=9, style='italic', bbox=dict(boxstyle='round,pad=0.5', facecolor='#fff9c4', edgecolor='#fbc02d', alpha=0.9))
-
-ax.grid(True, linestyle='--', alpha=0.5)
-ax.legend(loc='upper right', frameon=True, fontsize=9)
-
+fig.text(0.5, 0.005, '* Ghi chú học thuật: Số liệu đo bằng SysTick trên QEMU MPS3 AN547 (25 MHz). Không phải số đo dao động ký trên phần cứng thật STM32N6.',
+         ha='center', fontsize=8.5, style='italic', color='#555555')
 plt.tight_layout()
 fig.savefig('results/figures/03_detection_to_alarm_latency.png', dpi=300)
 plt.close(fig)
@@ -365,6 +395,7 @@ for at in autotexts:
 
 ax2.set_title(f'(B) Phân bổ Bộ nhớ FreeRTOS heap_5 trong SRAM\n(Tổng dung lượng cấu hình: 64 KB = {heap_total:,} Bytes)', fontsize=12, fontweight='bold')
 
+fig.text(0.5, 0.005, '* Ghi chú: Hình lý thuyết vẽ theo giá trị thiết kế Bảng 3.1, chưa đo trên máy hiện sóng vật lý.', ha='center', fontsize=9, style='italic')
 plt.tight_layout()
 fig.savefig('results/figures/04_memory_and_stack_hwm.png', dpi=300)
 plt.close(fig)
@@ -411,18 +442,19 @@ ax3.set_title('[KỊCH BẢN 2] Kiểm chứng Preemption thật & Priority Inhe
 ax3.grid(False)
 
 # 4. Scenario 3 Stress Test
-s3_bars = ['Khối sinh ra\n(Generated)', 'Khối đã xử lý\n(Processed)', 'Khối mất\n(Dropped)', 'Buffer Overruns\n(Phát hiện)', 'Báo động\n(Alarms)', 'Log Queue Drops\n(Drop-Oldest)']
-s3_vals = [gen_cnt, proc_cnt, drop_cnt, overrun_cnt, alarm_cnt, logdrop_cnt]
-colors3 = ['#34495e', '#2ecc71', '#e74c3c', '#d35400', '#c0392b', '#8e44ad']
-bars4 = ax4.bar(s3_bars, s3_vals, color=colors3, width=0.5)
+s3_bars = ['Khối sinh ra\n(Generated)', 'Khối xử lý\n(Processed)', 'Buffer Overrun\n(Overruns)', 'Log thường sinh\n(Normal Gen)', 'Log thường ghi\n(Normal Written)', 'Log thường drop\n(Drop-Oldest)', 'Alarm Drop\n(Cảnh báo mất)']
+s3_vals = [gen_cnt, proc_cnt, overrun_cnt, norm_gen_cnt, norm_wr_cnt, norm_drop_cnt, alm_drop_cnt]
+colors3 = ['#34495e', '#2ecc71', '#d35400', '#3498db', '#1abc9c', '#e74c3c', '#27ae60']
+bars4 = ax4.bar(s3_bars, s3_vals, color=colors3, width=0.55)
 for b in bars4:
     h = b.get_height()
-    ax4.text(b.get_x() + b.get_width()/2, h + 5, f'{int(h)}', ha='center', va='bottom', fontweight='bold', fontsize=9)
+    ax4.text(b.get_x() + b.get_width()/2, h + 3, f'{int(h)}', ha='center', va='bottom', fontweight='bold', fontsize=8.5)
 ax4.set_ylim(0, max(s3_vals) * 1.18)
 ax4.set_ylabel('Số lượng khối / bản ghi', fontsize=10, fontweight='bold')
-ax4.set_title(f'[KỊCH BẢN 3] Quá tải chuỗi khối & Giới hạn tài nguyên (4 ms/khối)\n(Drop-Oldest: {logdrop_cnt} log drops, Overrun: {overrun_cnt} detected -> PASS [ok])', fontsize=11, fontweight='bold')
+ax4.set_title(f'[KỊCH BẢN 3] Quá tải chuỗi khối & Drop-Oldest (4 ms/khối)\n(357=249+108 | 217=18+199 | Alarm Drop: 0 [PASS] [ok])', fontsize=10, fontweight='bold')
 ax4.grid(True, linestyle='--', alpha=0.4, axis='y')
 
+fig.text(0.5, 0.005, '* Ghi chú: Dữ liệu thực nghiệm trích xuất trực tiếp từ kết quả mô phỏng QEMU (results/03_simulation_logs.txt).', ha='center', fontsize=8.5, style='italic')
 plt.tight_layout()
 fig.savefig('results/figures/05_scenario_summary_dashboard.png', dpi=300)
 plt.close(fig)

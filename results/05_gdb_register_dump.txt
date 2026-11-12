@@ -5,18 +5,18 @@ Nen tang    : QEMU mps3-an547
 Su kien     : Exception 14 (PendSV Interrupt) - Thoi diem chuyen giao CPU giua cac Task
 ================================================================================
 
-[1] SNAPSHOT THANH GHI PHAN CUNG QEMU CORTEX-M55 TAI PendSV_Handler (0x00004994):
+[1] SNAPSHOT THANH GHI PHAN CUNG QEMU CORTEX-M55 TAI PendSV_Handler (0x000050E0):
 --------------------------------------------------------------------------------
 XPSR=61000000 -ZC- T S priv-thread
 R00=00000000 R01=00000000 R02=00000000 R03=00000000
-R04=00000000 R05=2101bc20 R06=20001968 R07=ffffffff
-R08=00000000 R09=00000001 R10=213f0000 R11=00000000
-R12=00000000 R13=213fff98 R14=fffffffd R15=00004994
+R04=00000000 R05=2101bcfc R06=20001960 R07=ffffffff
+R08=00000000 R09=00000001 R10=00000001 R11=00000000
+R12=00000000 R13=213fff98 R14=fffffffd R15=000050e0
 XPSR=0100000e ---- T S handler
-R00=20001920 R01=00000000 R02=00000000 R03=00000000
-R04=00000000 R05=2101bc20 R06=20001968 R07=ffffffff
-R08=00000000 R09=00000001 R10=213f0000 R11=00000000
-R12=00000000 R13=213fff98 R14=fffffffd R15=000049a2
+R00=20001910 R01=00000000 R02=00000000 R03=00000000
+R04=00000000 R05=2101bcfc R06=20001960 R07=ffffffff
+R08=00000000 R09=00000001 R10=00000001 R11=00000000
+R12=00000000 R13=213fff98 R14=fffffffd R15=000050ee
 --------------------------------------------------------------------------------
 
 [2] PHAN TICH CHI TIET GIA TRI THANH GHI:
@@ -29,7 +29,7 @@ R12=00000000 R13=213fff98 R14=fffffffd R15=000049a2
    - Mang ma EXC_RETURN dac thu cua kien truc ARMv8.1-M:
      * 0xFFFFFFFD: Tro ve Thread Mode, su dung PSP, khong co Extended Frame.
      * 0xFFFFFFBC: Tro ve Thread Mode, su dung PSP, co Extended Frame cho FPU/Helium MVE.
-4. R15 (PC - Program Counter = 0x00004994):
+4. R15 (PC - Program Counter = 0x000050E0):
    - Chinh xac dia chi entry point cua PendSV_Handler trong bang vector ngat.
 5. XPSR (Program Status Register = 0x0100000E):
    - Bit [8:0] = 0x0E (Thap phan: 14) -> Dang phuc vu Exception 14 (PendSV Exception).

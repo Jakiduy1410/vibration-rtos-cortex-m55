@@ -36,17 +36,23 @@ s2_inheritance_verified = "PRIORITY INHERITANCE TEST COMPLETED [ok]" in log_cont
 # Parse Scenario 3 / Benchmark Summary
 m_gen = re.search(r'Tong so khoi sinh ra \(Generated\)\s*:\s*(\d+)', log_content)
 m_proc = re.search(r'Tong so khoi da xu ly \(Processed\)\s*:\s*(\d+)', log_content)
-m_drop = re.search(r'So khoi bi mat do tran/overrun\s*:\s*(\d+)', log_content)
-m_overrun = re.search(r'So lan phat hien overrun bo dem\s*:\s*(\d+)', log_content)
-m_alarms = re.search(r'Tong so lan kich hoat Canh bao\s*:\s*(\d+)', log_content)
-m_logdrop = re.search(r'So ban ghi log bi drop \(xLogQueue\)\s*:\s*(\d+)', log_content)
+m_overrun = re.search(r'So lan tran bo dem DMA \(Overrun\)\s*:\s*(\d+)', log_content)
+m_normal_gen = re.search(r'Log thuong sinh ra \(Normal Gen\)\s*:\s*(\d+)', log_content)
+m_normal_written = re.search(r'Log thuong da ghi \(Normal Written\)\s*:\s*(\d+)', log_content)
+m_normal_drop = re.search(r'Log thuong bi drop \(Normal Drop\)\s*:\s*(\d+)', log_content)
+m_alarm_gen = re.search(r'Log canh bao sinh \(Alarm Gen\)\s*:\s*(\d+)', log_content)
+m_alarm_written = re.search(r'Log canh bao da ghi \(Alarm Written\)\s*:\s*(\d+)', log_content)
+m_alarm_drop = re.search(r'Log canh bao bi drop \(Alarm Drop\)\s*:\s*(\d+)', log_content)
 
 gen_blocks = int(m_gen.group(1)) if m_gen else 0
 proc_blocks = int(m_proc.group(1)) if m_proc else 0
-drop_blocks = int(m_drop.group(1)) if m_drop else 0
 overrun_cnt = int(m_overrun.group(1)) if m_overrun else 0
-alarm_cnt = int(m_alarms.group(1)) if m_alarms else 0
-logdrop_cnt = int(m_logdrop.group(1)) if m_logdrop else 0
+normal_gen = int(m_normal_gen.group(1)) if m_normal_gen else 0
+normal_written = int(m_normal_written.group(1)) if m_normal_written else 0
+normal_drop = int(m_normal_drop.group(1)) if m_normal_drop else 0
+alarm_gen = int(m_alarm_gen.group(1)) if m_alarm_gen else 0
+alarm_written = int(m_alarm_written.group(1)) if m_alarm_written else 0
+alarm_drop = int(m_alarm_drop.group(1)) if m_alarm_drop else 0
 
 # Parse Heap Stats
 m_heap_tot = re.search(r'Tong dung luong Heap cau hinh\s*:\s*(\d+)', log_content)
@@ -132,7 +138,7 @@ DSP Library  : ARM CMSIS-DSP 5.9.0 (Helium Optimized Vector Math)
    - .dtcm_bss: {dtcm_total:,} Bytes ({dtcm_kb:.2f} KB / 128 KB, chiem {dtcm_total/131072*100:.2f}%).
    - Thanh phan chi tiet trong DTCM (Dung theo Thiet ke Chuong III Bang 3.3):
      * Bo dem doi DMA (g_DoubleBuffer): 2 x 512 x 2 Bytes = 2,048 Bytes (2.0 KB).
-     * Workspace FFT CMSIS-DSP (Input/Output/Mag): 5,120 Bytes (5.0 KB, can le 16 byte cho Helium MVE).
+     * Workspace FFT CMSIS-DSP (g_FFT_Input + g_FFT_Output): 4,096 Bytes (Dung 4.0 KB theo Bang 3.3 Chuong III, tai su dung g_FFT_Input cho magnitude).
      * Ngan xep Task toi han (Critical Task Stacks):
        + vTaskAlarm Stack       : 1,024 Bytes (256 words, Pri 5).
        + vTaskAcquisition Stack : 1,024 Bytes (256 words, Pri 4).
@@ -226,10 +232,10 @@ Tong so thanh ghi duoc bao toan trong 1 lan Context Switch day du FPU/MVE:
 [2] THONG KE SO CAU LENH VA UOC TINH THOI GIAN THUC THI:
 - Tong so cau lenh Assembly trong PendSV_Handler: {inst_count} cau lenh.
 - Uoc tinh chu ky CPU tren Cortex-M55:
-  * Hardware auto-stacking / unstacking (DTCM 0-wait state): ~24 chu ky.
-  * Software load / store multiple (vstmdb, stmdb, vldmia, ldmia): ~30 chu ky.
-  * vTaskSwitchContext (O(1) voi CLZ): ~16 chu ky.
-  * Tong chi phi Context Switch: ~70 chu ky CPU (~2.8 micro giay tai tan so 25 MHz cua QEMU AN547).
+  * Hardware auto-stacking / unstacking (DTCM 0-wait state): ~24 - 32 chu ky.
+  * Software load / store multiple (vstmdb, stmdb, vldmia, ldmia): ~64 - 80 chu ky.
+  * vTaskSwitchContext (O(1) voi CLZ): ~32 - 48 chu ky.
+  * Tong chi phi Context Switch: ~120 - 160 chu ky CPU (do FPU/MVE lazy stacking va luu tru 53 thanh ghi tren Cortex-M55, tuong duong ~4.8 - 6.4 micro giay tai tan so 25 MHz cua QEMU AN547).
 
 [3] DISASSEMBLY CHI TIET CUA PendSV_Handler:
 --------------------------------------------------------------------------------

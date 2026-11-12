@@ -23,16 +23,16 @@ Hệ thống bao gồm đúng **4 tác vụ ứng dụng + 1 tác vụ Idle**, t
 
 | Tác Vụ (Task Name) | Mức Ưu Tiên | Chu Kỳ ($T_i$) / Hạn ($D_i$) | Thời Gian Tính ($C_i$) | Vùng Nhớ Ngăn Xếp | Kích Thước Stack (Byte / Word) | Vai Trò & Cơ Chế Hoạt Động |
 |:---|:---:|:---:|:---:|:---:|:---:|:---|
-| **`vTaskAlarm`** | **5** (Cao nhất) | Phi chu kỳ ($D_i = 10.0$ ms) | $1.0$ ms | **DTCM** | 1,024 B (256 words) | Chờ Task Notification mang mã sự kiện từ Xử lý. Kích hoạt trực tiếp cơ cấu chấp hành (Còi/Đèn/Rơ-le) qua thanh ghi. **Tuyệt đối không lấy Mutex hay gọi UART**. |
+| **`vTaskAlarm`** | **5** (Cao nhất) | Phi chu kỳ ($D_i = 10.0$ ms) | $1.0$ ms | **DTCM** | 1,024 B (256 words) | Chờ Task Notification mang mã sự kiện từ Xử lý. Kích hoạt trực tiếp cơ cấu chấp hành (Còi/Đèn/Rơ-le) qua thanh ghi; được phép in trực tiếp 1 dòng thông báo khẩn cấp ra UART (vì không thể chờ Logging chu kỳ 1,000 ms), tuyệt đối không lấy Mutex hay gửi qua queue thường. |
 | **`vTaskAcquisition`** | **4** | Chu kỳ $T = 64$ ms ($D_i = 64$ ms) | $2.0$ ms | **DTCM** | 1,024 B (256 words) | Chờ Binary Semaphore `xBlockReady` từ ngắt DMA stub. Đóng gói mô tả khối (`BlockDescriptor_t`) gửi vào `xBlockQueue`. |
 | **`vTaskProcessing`** | **3** | Chu kỳ $T = 64$ ms ($D_i = 64$ ms) | $12.0$ ms | **DTCM** | 4,096 B (1,024 words) | Nhận khối, tăng tốc Vector Helium CMSIS-DSP tính toán FFT 512 mẫu, trích xuất đặc trưng rung động, so ngưỡng quyết định phát tín hiệu cảnh báo. |
-| **`vTaskLogging`** | **2** | Chu kỳ $T = 1,000$ ms ($D_i = 1,000$ ms) | $20.0$ ms | **SRAM** | 2,048 B (512 words) | Nhận bản ghi telemetry qua `xLogQueue` (bảo vệ bởi `xLogMutex`). Quản lý in log định kỳ ra UART và điều phối các kịch bản kiểm thử. |
+| **`vTaskLogging`** | **2** | Chu kỳ $T = 1,000$ ms ($D_i = 1,000$ ms) | $20.0$ ms | **SRAM** | 2,048 B (512 words) | Nhận bản ghi telemetry qua `xLogQueue` (bảo vệ bởi `xLogMutex`) và `xAlarmLogQueue`. Quản lý in log định kỳ ra UART và điều phối các kịch bản kiểm thử. |
 | **`Idle Task`** | **0** (Thấp nhất) | Khi CPU rảnh rỗi | - | **SRAM** | 512 B (128 words) | Thu dọn tác vụ đã xóa, hỗ trợ `configUSE_TICKLESS_IDLE = 1` để tối ưu năng lượng. |
 
 > **Kiểm chứng khả năng lập lịch (RMA Schedulability)**:  
-> Tổng hệ số sử dụng CPU của 3 tác vụ chu kỳ:
+> Hệ thống có đúng $n = 3$ tác vụ định kỳ độc lập. Tổng hệ số sử dụng CPU:
 > $$U = \frac{C_{\text{Acq}}}{T_{\text{Acq}}} + \frac{C_{\text{Proc}}}{T_{\text{Proc}}} + \frac{C_{\text{Log}}}{T_{\text{Log}}} = \frac{2.0}{64.0} + \frac{12.0}{64.0} + \frac{20.0}{1000.0} = 3.125\% + 18.75\% + 2.0\% = 23.875\% \approx 23.9\%$$
-> Giá trị này thấp hơn nhiều so với cận trên Liu & Layland: $U_{\text{bound}} = 3(2^{1/3} - 1) \approx 77.98\%$. Toàn bộ các tác vụ đảm bảo đáp ứng hạn định nghiêm ngặt!
+> Giá trị này thấp hơn nhiều so với cận trên Liu & Layland cho $n = 3$: $U_{\text{bound}}(3) = 3(2^{1/3} - 1) \approx 78.0\%$. Toàn bộ các tác vụ đảm bảo đáp ứng hạn định nghiêm ngặt!
 
 ---
 
@@ -40,9 +40,10 @@ Hệ thống bao gồm đúng **4 tác vụ ứng dụng + 1 tác vụ Idle**, t
 
 1. **`xBlockReady` (Binary Semaphore)**: Cầu nối trực tiếp giữa Trình phục vụ ngắt DMA stub (`Interrupt0_IRQHandler`) và `vTaskAcquisition` khi một nửa bộ đệm đôi (512 mẫu) đã nạp xong.
 2. **`xBlockQueue` (Queue sâu 2 phần tử)**: Truyền cấu trúc mô tả khối `BlockDescriptor_t` (kích thước chỉ 16 bytes gồm con trỏ bộ đệm trong DTCM, số thứ tự khối, nhãn thời gian) từ `vTaskAcquisition` sang `vTaskProcessing`. Tránh tuyệt đối việc sao chép cồng kềnh toàn bộ 512 mẫu int16.
-3. **`Task Notification` (Gửi trực tiếp không dùng Queue)**: Cơ chế giao tiếp điểm-điểm tốc độ cao nhất giữa `vTaskProcessing` và `vTaskAlarm`. Mang trực tiếp mã sự kiện (`EVENT_HARD_ALARM`, `EVENT_SOFT_ALARM`), đánh thức `vTaskAlarm` tức thời (0 tick) để cướp quyền CPU xử lý sự cố.
-4. **`xLogQueue` (Queue sâu $8 \times 32$ B) + `xLogMutex`**:
-   - `xLogQueue`: Hàng đợi chứa các bản ghi `LogEntry_t` (32 bytes). Áp dụng chính sách **Drop-Oldest**: khi hàng đợi đầy (trong điều kiện quá tải/burst stress), tự động đọc bỏ bản ghi cũ nhất để luôn bảo tồn bản ghi sự cố mới nhất.
+3. **`Task Notification` (Gửi trực tiếp không dùng Queue)**: Cơ chế giao tiếp điểm-điểm tốc độ cao nhất giữa `vTaskProcessing` và `vTaskAlarm`. Mang trực tiếp mã sự kiện (`EVENT_HARD_ALARM`, `EVENT_SOFT_ALARM`), đánh thức `vTaskAlarm` tức thời để cướp quyền CPU xử lý sự cố.
+4. **Phân tách Hàng đợi Log Thường & Log Cảnh báo**:
+   - `xLogQueue` (Queue sâu $8 \times 32$ B): Hàng đợi chứa các bản ghi `LogEntry_t` telemetry định kỳ. Áp dụng chính sách **Drop-Oldest**: khi hàng đợi đầy trong điều kiện quá tải/burst stress, tự động đọc bỏ bản ghi cũ nhất để luôn bảo tồn bản ghi mới nhất.
+   - `xAlarmLogQueue` (Queue sâu $8 \times 32$ B): Hàng đợi riêng biệt dành độc quyền cho bản ghi sự cố cảnh báo khẩn cấp, đảm bảo **không bao giờ bị mất bản ghi cảnh báo nào** (0 Alarm Drop).
    - `xLogMutex`: Mutex hỗ trợ **Thừa kế mức ưu tiên (Priority Inheritance)**, chỉ dùng chung giữa `vTaskProcessing` và `vTaskLogging`. `vTaskAlarm` **tuyệt đối không bao giờ lấy Mutex** để ngăn ngừa hiện tượng đảo ngược ưu tiên (Priority Inversion).
 
 ---
@@ -50,22 +51,23 @@ Hệ thống bao gồm đúng **4 tác vụ ứng dụng + 1 tác vụ Idle**, t
 ## 💾 Kiến Trúc Phân Bổ Bộ Nhớ Tối Ưu (Linker Script `mps3_an547.ld`)
 
 Dựa trên bảng phân vùng bộ nhớ Bảng 3.3 Chương III:
-- **FLASH (0x00000000, Dung lượng 512 KB)**: Chứa toàn bộ mã thực thi `.text`, bảng vector ngat, bảng tra sin CMSIS-DSP, thư viện FreeRTOS kernel và ứng dụng. Chiếm dụng thực tế: **145.4 KB** (27.75%).
+- **FLASH (0x00000000, Dung lượng 512 KB)**: Chứa toàn bộ mã thực thi `.text`, bảng vector ngắt, bảng tra sin CMSIS-DSP, thư viện FreeRTOS kernel và ứng dụng. Chiếm dụng thực tế: **145.07 KB** (28.33%).
 - **DTCM (0x20000000, Dung lượng 128 KB - Tốc độ cao 0-wait state)**:
   - Bộ đệm đôi DMA (`g_DoubleBuffer`): $2 \times 512 \times 2\text{ Bytes} = 2,048\text{ Bytes}$ ($2.0\text{ KB}$).
-  - Workspace FFT CMSIS-DSP (`g_FFT_Input`, `g_FFT_Output`, `g_Mag_Spectrum` căn lề 16-byte): $5,120\text{ Bytes}$ ($5.0\text{ KB}$).
+  - Workspace FFT CMSIS-DSP (`g_FFT_Input`, `g_FFT_Output` căn lề 16-byte): **đúng 4,096 Bytes** ($4.0\text{ KB}$, Bảng 3.3 Chương III, tái sử dụng `g_FFT_Input` cho phổ biên độ, không cấp phát mảng 1.024 B dư thừa).
   - Ngăn xếp 3 Tác vụ Tới hạn: `vTaskAlarm` ($1,024\text{ B}$), `vTaskAcquisition` ($1,024\text{ B}$), `vTaskProcessing` ($4,096\text{ B}$) $\Rightarrow$ Tổng cộng $6,144\text{ Bytes}$ ($6.0\text{ KB}$).
-  - Tổng chiếm dụng DTCM: **13.4 KB / 128 KB** (10.47%).
+  - Tổng chiếm dụng DTCM: **12.4 KB / 128 KB** (9.69%).
 - **SRAM (0x21000000, Dung lượng 4 MB)**:
   - Vùng nhớ động FreeRTOS `heap_5.c`: **64 KB** ($65,536\text{ Bytes}$).
   - Ngăn xếp Tác vụ Không tới hạn: `vTaskLogging` ($2,048\text{ B}$), `Idle Task` ($512\text{ B}$).
-  - Ngăn xếp khởi động và xử lý ngat NVIC (MSP Stack): **8 KB** ($8,192\text{ B}$).
+  - Ngăn xếp khởi động và xử lý ngắt NVIC (MSP Stack): **8 KB** ($8,192\text{ B}$).
+  - Tổng SRAM chiếm dụng: **136.18 KB / 4,096 KB** (3.32%).
 
 ---
 
 ## 🧪 Bộ 4 Bài Kiểm Tra Chuẩn Vàng (Golden FFT Verification Suite)
 
-Trước khi khởi động Scheduler, firmware tự động thực thi Suite 4 bài kiểm tra chuẩn vàng để kiểm chứng tính toàn vẹn toán học của thuật toán RFFT 512 điểm trên Cortex-M55:
+Trước khi khởi động Scheduler, firmware tự động thực thi Suite 4 bài kiểm tra chuẩn vàng (kiểm soát bởi cổng điều kiện `if (all_passed)`) để kiểm chứng tính toàn vẹn toán học của thuật toán RFFT 512 điểm trên Cortex-M55:
 1. **Golden Test 1 - Hằng số DC (+1.0)**: Toàn bộ 512 mẫu bằng $+1.0 \Rightarrow$ Phổ chỉ có duy nhất bin DC đạt độ lớn chính xác $512.00$, toàn bộ các bin AC bằng $0.00$ $\rightarrow$ **PASS [ok]**.
 2. **Golden Test 2 - Xung đơn vị (Unit Impulse)**: 1 xung $+1.0$ tại mẫu 0, các mẫu khác $0.0 \Rightarrow$ Phổ phẳng hoàn toàn (Flat Spectrum), độ lớn $1.00$ trên mọi bin tần số $\rightarrow$ **PASS [ok]**.
 3. **Golden Test 3 - Xung chữ nhật (Rectangular Pulse 6 mẫu)**: 6 mẫu $+1.0$ liên tiếp $\Rightarrow$ Bao phổ dạng Sinc, biên độ DC chính xác bằng $6.00$ $\rightarrow$ **PASS [ok]**.
@@ -81,12 +83,15 @@ Trước khi khởi động Scheduler, firmware tự động thực thi Suite 4 
 - Kết quả: `vTaskProcessing` nhận diện chính xác $RMS = 2.22g$ tại Khối #6 và $RMS = 2.84g$ tại Khối #14 (vượt ngưỡng cứng $2.0g$). Kích hoạt tức thời 2 cảnh báo khẩn cấp `BUZZER_ON + RELAY_TRIP`. Các khối bình thường được ghi log thưa theo tỉ lệ $1:16$ ($\approx 1\text{ bản ghi/giây}$). $\rightarrow$ **PASS [ok]**.
 
 ### Kịch bản 2: Kiểm chứng Preemption thật & Priority Inheritance
-- **Phần A (Real Preemption)**: Tại Tick 2048 ms, khi `vTaskProcessing` (Pri 3) đang thực thi chuỗi tính toán FFT nặng, sự cố khẩn cấp xuất hiện. `vTaskAlarm` (Pri 5) lập tức cướp quyền CPU giữa chừng phép tính FFT với độ trễ 0 tick, hoàn tất đóng rơ-le an toàn, sau đó trả lại CPU cho `vTaskProcessing` tiếp tục tính toán hoàn tất không gián đoạn. $\rightarrow$ **PASS [ok]**.
-- **Phần B (Priority Inheritance)**: `vTaskLogging` (Pri 2) giữ `xLogMutex`. `vTaskProcessing` (Pri 3) yêu cầu Mutex và rơi vào trạng thái Blocked. Ngay lập tức, FreeRTOS nâng ưu tiên của `vTaskLogging` lên mức **3**. Khi `vTaskAcquisition` (Pri 4) thức dậy, do có mức ưu tiên cao hơn mức thừa kế (4 > 3), tác vụ Thu thập cướp quyền CPU thành công. Sau khi giải phóng Mutex, ưu tiên của `vTaskLogging` được khôi phục về mức **2**. $\rightarrow$ **PASS [ok]**.
+- **Phần A (Real Mid-FFT Preemption)**: Tại Tick 2048 ms, khi `vTaskProcessing` (Pri 3) đang thực thi biến đổi Fourier, ngắt phần mềm `Interrupt1_IRQn` được kích hoạt từ hook `rfft_mid_stage_hook()` ngay giữa các tầng bướm FFT. `vTaskAlarm` (Pri 5) lập tức cướp quyền CPU giữa chừng phép tính FFT ($t_{\text{start}} < t_{\text{irq}} \le t_{\text{actuate}} < t_{\text{end}}$), hoàn tất đóng rơ-le an toàn, sau đó trả lại CPU cho `vTaskProcessing` tiếp tục tính toán hoàn tất không lỗi. $\rightarrow$ **PASS [ok]**.
+- **Phần B (Genuine Priority Inheritance)**: Tranh chấp 3 task thật trên `xLogMutex` (§3.3.3 Chương III). `vTaskLogging` (Pri 2) giữ `xLogMutex`. `vTaskProcessing` (Pri 3) yêu cầu Mutex và bị chặn. FreeRTOS kernel tự động nâng ưu tiên của `vTaskLogging` từ 2 lên **3**. Khi `vTaskAcquisition` (Pri 4) thức dậy, do có ưu tiên cao hơn (4 > 3), tác vụ Thu thập cướp CPU thành công. Sau khi giải phóng Mutex, ưu tiên của `vTaskLogging` tự động khôi phục về mức gốc **2**. Cấm tuyệt đối `vTaskPrioritySet` để mô phỏng. $\rightarrow$ **PASS [ok]**.
 
-### Kịch bản 3: Thử nghiệm quá tải & Giới hạn tài nguyên (Stress Test)
-- Đẩy nhịp DMA từ 64 ms xuống **4 ms/khối**, liên tục chèn tín hiệu bất thường trong khi `vTaskProcessing` mô phỏng tải tính toán định mức ($C_i \approx 10-12$ ms).
-- Kết quả: Ghi nhận chính xác **126 lần phát hiện tràn bộ đệm đôi (Buffer Overrun)** và **35 bản ghi bị loại bỏ an toàn** trên `xLogQueue` theo đúng chính sách **Drop-Oldest**. Hệ thống không bị treo, không tràn ngăn xếp (Stack Overflow) và không rò rỉ bộ nhớ Heap. $\rightarrow$ **PASS [ok]**.
+### Kịch bản 3: Thử nghiệm quá tải & Đẳng thức toán học (Stress Test)
+- Đẩy nhịp DMA từ 64 ms xuống **4 ms/khối** ($16\times$ quá tải), mô phỏng tắc nghẽn bộ đệm và bão hòa hàng đợi.
+- Kết quả nghiệm thu đẳng thức bảo toàn:
+  * **Đẳng thức khối**: $\text{Generated} (240) = \text{Processed} (174) + \text{Buffer\_Overruns} (66)$ $\rightarrow$ **DANG THUC DUNG [PASS] [ok]**.
+  * **Đẳng thức log thường**: $\text{Normal\_Gen} (134) = \text{Normal\_Written} (10) + \text{Normal\_Dropped} (124)$ $\rightarrow$ **DANG THUC DUNG [PASS] [ok]**.
+  * **Bảo toàn cảnh báo**: $\text{Alarm\_Gen} = 3,\ \text{Alarm\_Written} = 3,\ \mathbf{Alarm\_Dropped = 0}$ $\rightarrow$ **KHÔNG MẤT BẤT KỲ BẢN GHI CẢNH BÁO NÀO [PASS] [ok]**.
 
 ---
 
@@ -94,35 +99,44 @@ Trước khi khởi động Scheduler, firmware tự động thực thi Suite 4 
 
 ```text
 ====================================================================
-       TONG KET SO LIEU THUC NGHIEM TOAN DIEN (CHUONG IV)          
+       TONG KET SO LIEU THUC NGHIEM TOAN DIEN (CHUONG IV - V2)     
 ====================================================================
-[1] THONG KE KHOI DU LIEU VA CANH BAO:
-    - Tong so khoi sinh ra (Generated)   : 245
-    - Tong so khoi da xu ly (Processed)  : 118
-    - So khoi bi mat do tran/overrun     : 251
-    - So lan phat hien overrun bo dem    : 126
-    - Tong so lan kich hoat Canh bao     : 45
-    - So ban ghi log bi drop (xLogQueue) : 35 (Chinh sach Drop-Oldest)
+[1] THONG KE KHOI DU LIEU VA LOG (DANG THUC TOAN HOC):
+    - Tong so khoi sinh ra (Generated)   : 240
+    - Tong so khoi da xu ly (Processed)  : 174
+    - So lan tran bo dem DMA (Overrun)   : 66
+    * Kiem tra dang thuc khoi: Generated == Processed + Overrun
+      (240 == 240) -> DANG THUC DUNG [PASS] [ok]
 
-[2] DO TRE PHAT HIEN -> BAO DONG (CANH BAO):
-    - Do tre cuc dai (Max Latency)       : 0 ms
-    - Do tre trung binh (Mean Latency)   : 0 ms
-    * Ghi chu: Day la do tre quan sat tren QEMU MPS3 AN547.
-      Khong phai so do tren phan cung that STM32N6.
+[2] PHAN TACH HANG DOI LOG THUONG VA LOG CANH BAO:
+    - Log thuong sinh ra (Normal Gen)    : 134
+    - Log thuong da ghi (Normal Written) : 10
+    - Log thuong bi drop (Normal Drop)   : 124 (Chinh sach Drop-Oldest tren xLogQueue)
+    * Kiem tra dang thuc log thuong: Generated == Written + Dropped
+      (134 == 134) -> DANG THUC DUNG [PASS] [ok]
+    - Log canh bao sinh (Alarm Gen)      : 3
+    - Log canh bao da ghi (Alarm Written): 3
+    - Log canh bao bi drop (Alarm Drop)  : 0 -> KHONG MAT BAT KY BAN GHI CANH BAO NAO [PASS] [ok]
 
-[3] THONG KE FREERTOS HEAP (heap_5.c - SRAM 64 KB):
+[3] DO TRE PHAT HIEN -> BAO DONG (DO CHU KY SYSTICK):
+    - Do tre cuc dai (Max Latency)       : 3004 cycles (120.16 us)
+    - Do tre trung binh (Mean Latency)   : 290 cycles (11.60 us)
+    * Ghi chu hoc thuat: So lieu do bang SysTick tren QEMU MPS3 AN547 (25 MHz).
+      Khong phai so do dao dong ky tren phan cung that STM32N6.
+
+[4] THONG KE FREERTOS HEAP (heap_5.c - SRAM 64 KB):
     - Tong dung luong Heap cau hinh      : 65536 Bytes (64 KB)
-    - Heap con trong hien tai (Free)     : 64832 Bytes (98.93%)
-    - Heap da cap phat thuc te (Used)    : 704 Bytes (1.07%)
+    - Heap con trong hien tai (Free)     : 64368 Bytes (98.22%)
+    - Heap da cap phat thuc te (Used)    : 1168 Bytes (1.78%)
 
-[4] BANG THEO DOI NGAN XEP (STACK HWM SO VOI BANG 3.1 CHUONG III):
+[5] BANG THEO DOI NGAN XEP (STACK HWM SO VOI BANG 3.1 CHUONG III):
 --------------------------------------------------------------------------------
 Task Name        | Prio | Memory | Alloc (Bytes) | Free HWM (Bytes) | Used (Bytes)
 --------------------------------------------------------------------------------
-vTaskAlarm       |  5   |  DTCM  |  1024 (256w)  |  864 Bytes       |  160 Bytes
-vTaskAcquisition |  4   |  DTCM  |  1024 (256w)  |  840 Bytes       |  184 Bytes
-vTaskProcessing  |  3   |  DTCM  |  4096 (1024w) |  3592 Bytes       |  504 Bytes
-vTaskLogging     |  2   |  SRAM  |  2048 (512w)  |  1712 Bytes       |  336 Bytes
+vTaskAlarm       |  5   |  DTCM  |  1024 (256w)  |  712 Bytes       |  312 Bytes
+vTaskAcquisition |  4   |  DTCM  |  1024 (256w)  |  828 Bytes       |  196 Bytes
+vTaskProcessing  |  3   |  DTCM  |  4096 (1024w) |  3568 Bytes       |  528 Bytes
+vTaskLogging     |  2   |  SRAM  |  2048 (512w)  |  1704 Bytes       |  344 Bytes
 Idle Task        |  0   |  SRAM  |   512 (128w)  |  352 Bytes       |  160 Bytes
 --------------------------------------------------------------------------------
 Ghi chu: Free HWM la so byte ngan xep toi thieu con du chua tung bi cham toi.
