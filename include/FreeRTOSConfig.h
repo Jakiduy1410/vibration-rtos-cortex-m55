@@ -5,6 +5,7 @@
 
 /*-----------------------------------------------------------
  * Application specific definitions.
+ * Conforming to Chapter III Architecture Design (Table 3.1)
  *----------------------------------------------------------*/
 
 #define configENABLE_MVE                        1
@@ -16,12 +17,12 @@
 
 #define configUSE_PREEMPTION                    1
 #define configUSE_PORT_OPTIMISED_TASK_SELECTION 1
-#define configUSE_TICKLESS_IDLE                 0
+#define configUSE_TICKLESS_IDLE                 1
 #define configCPU_CLOCK_HZ                      ( 25000000UL )
 #define configTICK_RATE_HZ                      ( ( TickType_t ) 1000 )
-#define configMAX_PRIORITIES                    ( 5 )
-#define configMINIMAL_STACK_SIZE                ( ( uint16_t ) 256 )
-#define configMAX_TASK_NAME_LEN                 ( 16 )
+#define configMAX_PRIORITIES                    ( 6 )
+#define configMINIMAL_STACK_SIZE                ( ( uint16_t ) 128 ) /* 128 words = 512 Bytes for Idle Task */
+#define configMAX_TASK_NAME_LEN                 ( 20 )
 #define configTICK_TYPE_WIDTH_IN_BITS           TICK_TYPE_WIDTH_32_BITS
 #define configIDLE_SHOULD_YIELD                 1
 #define configUSE_TASK_NOTIFICATIONS            1
@@ -37,14 +38,14 @@
 #define configNUM_THREAD_LOCAL_STORAGE_POINTERS 5
 
 /* Memory allocation definitions. */
-#define configSUPPORT_STATIC_ALLOCATION         0
+#define configSUPPORT_STATIC_ALLOCATION         1
 #define configSUPPORT_DYNAMIC_ALLOCATION        1
-#define configTOTAL_HEAP_SIZE                   ( ( size_t ) 65536 ) /* 64 KB */
+#define configTOTAL_HEAP_SIZE                   ( ( size_t ) 65536 ) /* 64 KB (heap_5) */
 #define configAPPLICATION_ALLOCATED_HEAP        0
 
 /* Hook function definitions. */
 #define configUSE_IDLE_HOOK                     0
-#define configUSE_TICK_HOOK                     0
+#define configUSE_TICK_HOOK                     1
 #define configCHECK_FOR_STACK_OVERFLOW          2
 #define configUSE_MALLOC_FAILED_HOOK            1
 #define configUSE_DAEMON_TASK_STARTUP_HOOK      0
@@ -58,13 +59,9 @@ extern volatile uint32_t ulHighFrequencyTimerTicks;
 #define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS() ( ulHighFrequencyTimerTicks = 0UL )
 #define portGET_RUN_TIME_COUNTER_VALUE()         ( ulHighFrequencyTimerTicks )
 
-/* Co-routine definitions. */
-#define configUSE_CO_ROUTINES                   0
-#define configMAX_CO_ROUTINE_PRIORITIES         ( 2 )
-
 /* Software timer definitions. */
 #define configUSE_TIMERS                        1
-#define configTIMER_TASK_PRIORITY               ( 2 )
+#define configTIMER_TASK_PRIORITY               ( 1 )
 #define configTIMER_QUEUE_LENGTH                10
 #define configTIMER_TASK_STACK_DEPTH            ( configMINIMAL_STACK_SIZE * 2 )
 
@@ -89,7 +86,7 @@ routine that makes calls to interrupt safe FreeRTOS API functions. */
 /* FreeRTOS MPU specific definitions. */
 #define configSYSTEM_CALL_STACK_SIZE            128
 
-/* Optional functions - most linkers will remove unused functions anyway. */
+/* Optional functions. */
 #define INCLUDE_vTaskPrioritySet                1
 #define INCLUDE_uxTaskPriorityGet               1
 #define INCLUDE_vTaskDelete                     1

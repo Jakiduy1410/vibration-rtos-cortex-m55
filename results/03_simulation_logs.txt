@@ -1,168 +1,415 @@
-
+QEMU 11.0.1 monitor - type 'help' for more information
+(qemu) 
 
 ====================================================================
 
    HE THONG GIAM SAT RUNG DONG & CANH BAO BAT THUONG (FreeRTOS)    
 
-   Architecture: ARM Cortex-M55 (ARMv8.1-M Mainline + FPU + MVE)   
-
-   Emulated on : QEMU mps3-an547 (AN547 FPGA image)                 
+   Thiet ke Chuong III - ARM Cortex-M55 + Helium MVE (QEMU AN547)   
 
 ====================================================================
 
-[Kernel] Initial Free Heap: 65536 Bytes (64 KB)
-
-[Kernel] Free Heap after creating 4 Tasks & IPCs: 52160 Bytes
-
-[Kernel] Starting FreeRTOS Scheduler...
+[Kernel] FreeRTOS heap_5 initialized: 65536 Bytes in SRAM
 
 
 
 ====================================================================
 
->>> GIAI DOAN 1: KICH BAN 1 - HOAT DONG BINH THUONG & PHAT HIEN ANOMALY
-
-    (Sampling period: 50ms / 20Hz. Injections at Sample #10 & #16)
+>>> CMSIS-DSP HELIUM REAL FFT GOLDEN VERIFICATION SUITE (512-POINT)
 
 ====================================================================
 
-[Process] Sample #1 Normal: RMS = 1.06g
+[GOLDEN TEST 1] DC Constant (+1.0):
 
-[Process] Sample #5 Normal: RMS = 1.11g
+  - Expected DC = 512.00, AC_max = 0.00
 
-[Logger Tick: 202 ms] FreeHeap: 48552 B | Gen: 5 | Proc: 5 | Drop: 0 | Alarms: 0
+  - Measured DC = 512.00, AC_max = 0.00 -> [PASS] [ok]
 
-[Process] Sample #9 Normal: RMS = 1.02g
+[GOLDEN TEST 2] Single Unit Impulse:
 
-[Logger Tick: 402 ms] FreeHeap: 48552 B | Gen: 9 | Proc: 9 | Drop: 0 | Alarms: 0
+  - Expected Flat Spectrum: Mag = 1.00 for all bins
 
-[Process] Sample #10 ANOMALY DETECTED! RMS = 4.18g > 2.50g -> Triggering Alarm!
+  - Measured Range: [0.99, 1.00] -> [PASS] [ok]
 
+[GOLDEN TEST 3] Rectangular Pulse (6 samples):
 
+  - Expected DC = 6.00, Sinc Envelope
 
->>> [EMERGENCY ALARM #1] Activated at Tick = 450 (Emergency Shutdown Signal Generated)
+  - Measured DC = 6.00 -> [PASS] [ok]
 
+[GOLDEN TEST 4] Sine 3 Cycles, Amplitude 3.0:
 
+  - Expected Bin 3 Mag = 768.00 (3.0 * 512 / 2), Other bins = 0.00
 
-[Process] Sample #13 Normal: RMS = 1.06g
-
-[Logger Tick: 602 ms] FreeHeap: 48552 B | Gen: 13 | Proc: 13 | Drop: 0 | Alarms: 1
-
-[Process] Sample #16 ANOMALY DETECTED! RMS = 4.18g > 2.50g -> Triggering Alarm!
-
-
-
->>> [EMERGENCY ALARM #2] Activated at Tick = 750 (Emergency Shutdown Signal Generated)
-
-
-
-[Process] Sample #17 Normal: RMS = 1.11g
-
-[Logger Tick: 802 ms] FreeHeap: 48552 B | Gen: 17 | Proc: 17 | Drop: 0 | Alarms: 2
-
-[Logger Tick: 1002 ms] FreeHeap: 48552 B | Gen: 20 | Proc: 20 | Drop: 0 | Alarms: 2
-
-
-
-====================================================================
-
->>> GIAI DOAN 2: KICH BAN 2 - KIEM CHUNG PREEMPTION VA MUTEX
-
-    (Triggering emergency alarm during computation)
-
-====================================================================
-
-[Process: Triggering Alarm at Tick T0 = 1200]
-
-[Alarm: Preempted CPU immediately at Tick T0 = 1200! Priority = 4]
-
-[Process: Resumed execution after Alarm finished at Tick = 1200]
-
-[Logger Tick: 1202 ms] FreeHeap: 48552 B | Gen: 21 | Proc: 21 | Drop: 0 | Alarms: 3
-
-[Logger Tick: 1402 ms] FreeHeap: 48552 B | Gen: 21 | Proc: 21 | Drop: 0 | Alarms: 3
-
-
-
-====================================================================
-
->>> GIAI DOAN 3: KICH BAN 3 - STRESS TEST & RESOURCE SATURATION
-
-    (High rate 2ms / 500Hz vs Slow Processing 8ms. Queue capacity: 10)
-
-====================================================================
-
-[Process-Stress] High RMS = 4.80g detected -> Signaling Alarm!
-
-
-
->>> [EMERGENCY ALARM #4] Activated at Tick = 1540 (Emergency Shutdown Signal Generated)
-
-
-
-[Logger Tick: 1602 ms] FreeHeap: 48552 B | Gen: 73 | Proc: 34 | Drop: 29 | Alarms: 4
-
-[Logger Tick: 1802 ms] FreeHeap: 48552 B | Gen: 101 | Proc: 51 | Drop: 50 | Alarms: 4
-
-[Logger Tick: 2002 ms] FreeHeap: 48552 B | Gen: 101 | Proc: 51 | Drop: 50 | Alarms: 4
-
-
-
-====================================================================
-
-       TONG KET SO LIEU THUC NGHIEM TOAN DIEN (SECTIONS 4.3 & 4.4)  
-
-====================================================================
-
-[1] THONG KE DULIEU VA CANH BAO:
-
-    - Tong so mau sinh ra (Generated)   : 101
-
-    - Tong so mau da xu ly (Processed)  : 51
-
-    - So goi bi rot do tran Queue (Drop): 50 (errQUEUE_FULL)
-
-    - Tong so lan canh bao (Alarms)     : 4
-
-
-
-[2] THONG KE FREERTOS HEAP (heap_4.c):
-
-    - Tong dung luong Heap cau hinh     : 65536 Bytes (64 KB)
-
-    - Heap con trong truoc khi tao Task : 65536 Bytes
-
-    - Heap con trong sau khi tao 4 Task : 52160 Bytes
-
-    - Heap con trong hien tai (Free)    : 48552 Bytes
-
-    - Heap da cap phat thuc te (Used)   : 16984 Bytes
-
-
-
-[3] BANG THEO DOI STACK HIGH WATER MARK (MUC 4.4.1):
+  - Measured Bin 3 = 768.00, Other_max = 0.00 -> [PASS] [ok]
 
 --------------------------------------------------------------------
 
-Task Name        | Prio | Alloc (Bytes) | Free HWM (Bytes) | Used (Bytes)
+>>> ALL 4 GOLDEN FFT VERIFICATION TESTS PASSED [ok] <<<
 
---------------------------------------------------------------------
+====================================================================
 
-Task_SensorSim   |  3   |  2048 (512w)  |  1704 Bytes       |  344 Bytes
+[Kernel] Created 4 IPC Objects: xBlockReady, xBlockQueue(2), xLogQueue(8x32B), xLogMutex
 
-Task_Process     |  2   |  4096 (1024w) |  3760 Bytes       |  336 Bytes
+[Kernel] Starting FreeRTOS Scheduler with 4 Tasks + Idle (Tick = 1000 Hz)...
 
-Task_Alarm       |  4   |  2048 (512w)  |  1888 Bytes       |  160 Bytes
 
-Task_Logger      |  1   |  4096 (1024w) |  3968 Bytes       |  128 Bytes
 
---------------------------------------------------------------------
+====================================================================
 
-Ghi chu: Free HWM la so byte stack toi thieu con du chua tung bi dung toi.
+>>> BAT DAU KICH BAN 1: HOAT DONG BINH THUONG VA PHAT HIEN ANOMALY <<<
+
+    (20 khoi @ 8 kHz, 64 ms/khoi. Chen loi tai Khoi #6 va #14)
 
 ====================================================================
 
 
 
-[QEMU] All 3 Scenarios completed successfully. Exiting simulation...
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=384 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=896 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+--- [LOGGER TELEMETRY @ 1000 ms] ---
+
+  [ENTRY #6] T=384ms | RMS=2.22g | Peak=3.51g | CF=1.57 | Freq=296.8Hz (Bin 19) | Level=2 [CRITICAL_ALARM]
+
+  [ENTRY #14] T=896ms | RMS=2.84g | Peak=4.00g | CF=1.40 | Freq=93.7Hz (Bin 6) | Level=2 [CRITICAL_ALARM]
+
+  >> Gen: 15 | Proc: 15 | DropBlk: 0 | Overruns: 0 | Alarms: 2 | LogDrop: 0 | FreeHeap: 64832 B
+
+
+
+--- [LOGGER TELEMETRY @ 2000 ms] ---
+
+  [ENTRY #16] T=1024ms | RMS=0.71g | Peak=1.00g | CF=1.40 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+
+  >> Gen: 31 | Proc: 31 | DropBlk: 0 | Overruns: 0 | Alarms: 2 | LogDrop: 0 | FreeHeap: 64832 B
+
+
+
+>>> KICH BAN 1 HOAN THANH: [PASS] [ok] (Da phat hien dung 2 su kien bat thuong)
+
+
+
+====================================================================
+
+>>> BAT DAU KICH BAN 2: KIEM CHUNG PREEMPTION THAT VA MUTEX PRIORITY INHERITANCE
+
+====================================================================
+
+[Process: Intensive FFT calculation active at Tick=2048 ms. Triggering emergency event without delay...]
+
+[Alarm: PREEMPTED CPU immediately in mid-FFT! Priority = 5 > 3 | Tick=2048 ms]
+
+[Process: RESUMED calculation seamlessly after Alarm preempted at Tick=2048 ms] -> Preemption verified! [PASS] [ok]
+
+
+
+====================================================================
+
+>>> KICH BAN 2 (PHAN B): KIEM CHUNG PRIORITY INHERITANCE TREN xLogMutex
+
+====================================================================
+
+[Inheritance Demo] Step 1: Logging (Pri=2) takes xLogMutex
+
+[Inheritance Demo] Step 2: Processing (Pri=3) blocks on xLogMutex
+
+[Inheritance Demo] Step 3: Logging priority BOOSTED to: 3 (Inherited from waiting Processing Task) [PASS] [ok]
+
+[Inheritance Demo] Step 4: Acquisition (Pri=4) arrives -> Can preempt boosted Logging (4 > 3) [PASS] [ok]
+
+[Inheritance Demo] Step 5: xLogMutex released -> Logging priority RESTORED to: 2 [PASS] [ok]
+
+--------------------------------------------------------------------
+
+>>> PRIORITY INHERITANCE TEST COMPLETED [ok] <<<
+
+
+
+>>> KICH BAN 2 HOAN THANH: [PASS] [ok]
+
+
+
+====================================================================
+
+>>> BAT DAU KICH BAN 3: STRESS TEST & GIOI HAN TAI NGUYEN (DROP-OLDEST)
+
+    (Burst mode 4 ms/khoi, chen lien tuc anomaly, bao hoa xLogQueue)
+
+====================================================================
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2165 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2185 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2215 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2225 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2255 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2265 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2295 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2305 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2335 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2345 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2375 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2385 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2415 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2425 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2455 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2465 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2495 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2505 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2535 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2545 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2575 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2585 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2615 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2625 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2655 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2665 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2695 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2705 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2735 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2745 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2775 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2785 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2815 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2825 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2855 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2865 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2895 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2905 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2935 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2945 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2975 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 ms (QEMU ticks) | Tick=2985 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+--- [LOGGER TELEMETRY @ 3000 ms] ---
+
+  [ENTRY #202] T=2827ms | RMS=2.22g | Peak=3.51g | CF=1.57 | Freq=296.8Hz (Bin 19) | Level=2 [CRITICAL_ALARM]
+
+  [ENTRY #204] T=2835ms | RMS=2.22g | Peak=3.51g | CF=1.57 | Freq=296.8Hz (Bin 19) | Level=2 [CRITICAL_ALARM]
+
+  [ENTRY #212] T=2867ms | RMS=2.22g | Peak=3.51g | CF=1.57 | Freq=296.8Hz (Bin 19) | Level=2 [CRITICAL_ALARM]
+
+  [ENTRY #214] T=2875ms | RMS=2.22g | Peak=3.51g | CF=1.57 | Freq=296.8Hz (Bin 19) | Level=2 [CRITICAL_ALARM]
+
+  [ENTRY #222] T=2907ms | RMS=2.22g | Peak=3.51g | CF=1.57 | Freq=296.8Hz (Bin 19) | Level=2 [CRITICAL_ALARM]
+
+  [ENTRY #224] T=2915ms | RMS=2.22g | Peak=3.51g | CF=1.57 | Freq=296.8Hz (Bin 19) | Level=2 [CRITICAL_ALARM]
+
+  [ENTRY #232] T=2947ms | RMS=2.22g | Peak=3.51g | CF=1.57 | Freq=296.8Hz (Bin 19) | Level=2 [CRITICAL_ALARM]
+
+  [ENTRY #234] T=2955ms | RMS=2.22g | Peak=3.51g | CF=1.57 | Freq=296.8Hz (Bin 19) | Level=2 [CRITICAL_ALARM]
+
+  >> Gen: 245 | Proc: 118 | DropBlk: 251 | Overruns: 126 | Alarms: 45 | LogDrop: 35 | FreeHeap: 64832 B
+
+
+
+>>> KICH BAN 3 HOAN THANH: [PASS] [ok] (Log drop va Overrun da duoc ghi nhan)
+
+
+
+====================================================================
+
+       TONG KET SO LIEU THUC NGHIEM TOAN DIEN (CHUONG IV)          
+
+====================================================================
+
+[1] THONG KE KHOI DU LIEU VA CANH BAO:
+
+    - Tong so khoi sinh ra (Generated)   : 245
+
+    - Tong so khoi da xu ly (Processed)  : 118
+
+    - So khoi bi mat do tran/overrun     : 251
+
+    - So lan phat hien overrun bo dem    : 126
+
+    - Tong so lan kich hoat Canh bao     : 45
+
+    - So ban ghi log bi drop (xLogQueue) : 35 (Chinh sach Drop-Oldest)
+
+
+
+[2] DO TRE PHAT HIEN -> BAO DONG (CANH BAO):
+
+    - Do tre cuc dai (Max Latency)       : 0 ms
+
+    - Do tre trung binh (Mean Latency)   : 0 ms
+
+    * Ghi chu: Day la do tre quan sat tren QEMU MPS3 AN547.
+
+      Khong phai so do tren phan cung that STM32N6.
+
+
+
+[3] THONG KE FREERTOS HEAP (heap_5.c - SRAM 64 KB):
+
+    - Tong dung luong Heap cau hinh      : 65536 Bytes (64 KB)
+
+    - Heap con trong hien tai (Free)     : 64832 Bytes
+
+    - Heap da cap phat thuc te (Used)    : 704 Bytes
+
+
+
+[4] BANG THEO DOI NGAN XEP (STACK HWM SO VOI BANG 3.1 CHUONG III):
+
+--------------------------------------------------------------------------------
+
+Task Name        | Prio | Memory | Alloc (Bytes) | Free HWM (Bytes) | Used (Bytes)
+
+--------------------------------------------------------------------------------
+
+vTaskAlarm       |  5   |  DTCM  |  1024 (256w)  |  864 Bytes       |  160 Bytes
+
+vTaskAcquisition |  4   |  DTCM  |  1024 (256w)  |  840 Bytes       |  184 Bytes
+
+vTaskProcessing  |  3   |  DTCM  |  4096 (1024w) |  3592 Bytes       |  504 Bytes
+
+vTaskLogging     |  2   |  SRAM  |  2048 (512w)  |  1712 Bytes       |  336 Bytes
+
+Idle Task        |  0   |  SRAM  |   512 (128w)  |  352 Bytes       |  160 Bytes
+
+--------------------------------------------------------------------------------
+
+Ghi chu: Free HWM la so byte ngan xep toi thieu con du chua tung bi cham toi.
+
+         Moi Task deu thoa man: Used < Alloc (Khong vuot ngan sach).
+
+====================================================================
+
+
+
+[QEMU] ALL 3 SCENARIOS COMPLETED SUCCESSFULLY. EXITING SIMULATION...
 

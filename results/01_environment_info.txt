@@ -1,21 +1,25 @@
-================================================================================  
-THONG TIN MOI TRUONG THUC NGHIEM (MUC 4.1.2)  
-Target: ARM MPS3 AN547 (Cortex-M55)  
-================================================================================  
-[1] GCC:  
-arm-none-eabi-gcc (GCC) 13.3.0
-Copyright (C) 2023 Free Software Foundation, Inc.
-This is free software; see the source for copying conditions.  There is NO
-warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+================================================================================
+THONG TIN MOI TRUONG THUC NGHIEM & CAU HINH HE THONG (CHUONG IV - MUC 4.1.2)
+================================================================================
+1. Phan cung mo phong (Target Platform):
+   - Platform       : ARM MPS3 FPGA Prototyping Board (Application Note AN547)
+   - CPU Architecture: ARM Cortex-M55 (ARMv8.1-M Mainline)
+   - Extensions     : ARM Helium Vector Extension (MVE-F & MVE-I), Single/Double Precision Hard FPU
+   - Clock Frequency: 25 MHz (QEMU Emulation Clock)
+   - Memory Map     :
+     * Flash ROM : 512 KB tai 0x00000000
+     * DTCM (Fast): 128 KB tai 0x20000000 (0 Wait-State: Double Buffer, FFT Workspace, Critical Stacks)
+     * SRAM (Ext): 4 MB tai 0x21000000 (FreeRTOS heap_5, Logging Stack, MSP Stack)
 
-  
-[2] QEMU:  
-QEMU emulator version 11.0.1
-Copyright (c) 2003-2026 Fabrice Bellard and the QEMU Project developers
-  
-[3] GDB:  
-GNU gdb (GDB) 17.2
-Copyright (C) 2025 Free Software Foundation, Inc.
-License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
-This is free software: you are free to change and redistribute it.
-There is NO WARRANTY, to the extent permitted by law.
+2. Phan mem va Cong cu (Toolchain & Software Stack):
+   - Compiler       : arm-none-eabi-gcc (GCC) 13.3.0
+   - Emulator       : QEMU emulator version 11.0.1
+   - RTOS Kernel    : FreeRTOS Kernel V11.1.0
+   - FreeRTOS Port  : GCC/ARM_CM55_NTZ/non_secure (Non-TrustZone, FPU & Helium MVE enabled)
+   - DSP Library    : ARM CMSIS-DSP 5.9.0 (TransformFunctions, StatisticsFunctions, FastMathFunctions)
+   - CMSIS Core     : CMSIS 5.9.0 Core ARMCM55
+
+3. Lenh bien dich va chay mo phong 1-dong (Single-command reproduction):
+   - Bien dich      : mingw32-make clean && mingw32-make
+   - Chay QEMU      : qemu-system-arm -machine mps3-an547 -cpu cortex-m55 -semihosting -kernel build/firmware.elf -nographic -serial stdio
+================================================================================

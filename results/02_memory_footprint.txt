@@ -1,62 +1,89 @@
 ================================================================================
-BAO CAO PHAN TICH PHAN BO BO NHO (MEMORY FOOTPRINT - MUC 4.4.1 & 4.4.3)
+BAO CAO PHAN TICH PHAN BO BO NHO THUC TE (MEMORY FOOTPRINT - MUC 4.4.1 & 4.4.3)
 Target Board : ARM MPS3 AN547 (Cortex-M55)
 Toolchain    : arm-none-eabi-gcc 13.3.0 (-O2 -g3 -mcpu=cortex-m55 -mfloat-abi=hard)
-RTOS Kernel  : FreeRTOS Kernel ARM_CM55_NTZ (Non-TrustZone, FPU & MVE Enabled)
+RTOS Kernel  : FreeRTOS Kernel 11.1.0 ARM_CM55_NTZ (non_secure, FPU & Helium MVE)
+DSP Library  : ARM CMSIS-DSP 5.9.0 (Helium Optimized Vector Math)
 ================================================================================
 
 [1] BANG TONG QUAT (Berkeley Format):
    text	   data	    bss	    dec	    hex	filename
-  18156	     32	  66536	  84724	  14af4	build/firmware.elf
+ 145444	  43780	  84636	 273860	  42dc4	build/firmware.elf
 
 
 [2] CHI TIET CAC SECTION BO NHO (System V Format):
 build/firmware.elf  :
-section             size        addr
-.text              18148           0
-.ARM.exidx             8       18148
-.copy.table           12       18156
-.zero.table            8       18168
-.data                 12   536870912
-.bss               66536   536870928
-.heap              16384   536937464
-.stack              8192   537387008
-.ARM.attributes       60           0
-.comment              18           0
-.debug_line_str      271           0
-.debug_info        58746           0
-.debug_abbrev      10948           0
-.debug_loclists    27589           0
-.debug_aranges      2072           0
-.debug_rnglists     3716           0
-.debug_macro       33696           0
-.debug_line        44876           0
-.debug_str        191261           0
-.debug_frame        6712           0
-Total             489265
+section              size        addr
+.text              145436           0
+.ARM.exidx              8      145436
+.copy.table            24      145444
+.zero.table            16      145468
+.dtcm_data              0   536870912
+.dtcm_bss           13728   536870912
+.data               43740   553648128
+.bss                70908   553691872
+.heap               16388   553762780
+.stack               8192   557834240
+.ARM.attributes        58           0
+.comment               18           0
+.debug_line_str       271           0
+.debug_info        110053           0
+.debug_abbrev       17141           0
+.debug_loclists     52454           0
+.debug_aranges       2656           0
+.debug_rnglists      6332           0
+.debug_macro        67854           0
+.debug_line         73216           0
+.debug_str         851795           0
+.debug_frame         8860           0
+Total             1489148
 
 
 
 
-[3] PHAN TICH CHI TIET PHAN BO TAI NGUYEN:
-- Flash ROM Consumption:
-  * .text (Executable Code): Chua toan bo Kernel FreeRTOS, CMSIS Core, Vector Table,
-    Thuat toan RMS/DSP tren FPU/MVE, va ung dung giam sat rung dong.
-  * .rodata (Read-Only Data): Chua cac chuoi hang so, bang hang so toan hoc.
-  * .ARM.exidx: Bang Exception Index dung cho Stack Unwinding.
-  * Tong ROM su dung thuc te: ~18.2 KB / 512 KB Flash cua AN547 (chiem ~3.55%).
+[3] PHAN TICH PHAN BO TAI NGUYEN THEO VUNG NHO (MEMORY MAP MPS3 AN547):
+1. Vung FLASH ROM (0x00000000, Dung luong 512 KB):
+   - .text (Executable Code): 145,436 Bytes
+     (Chua Kernel FreeRTOS 11.1.0, CMSIS-DSP 5.9.0 RFFT/CMSIS Core, Vector Table,
+      He thong giam sat rung dong va 4 Kich ban kiem chung).
+   - .ARM.exidx: 8 Bytes (Exception index table).
+   - .copy.table / .zero.table: 40 Bytes (CMSIS Startup init tables).
+   - Tong ROM Flash chiem dung: 145,484 Bytes (142.07 KB / 512 KB, chiem 27.75%).
 
-- RAM / SRAM Consumption:
-  * .data (Initialized Variables): Chua cac bien khoi tao toan cuc (~32 Bytes).
-  * .bss (Zero-Initialized Data): Chua toan bo mang Heap FreeRTOS heap_4.c (65536 Bytes)
-    va cac bien toan cuc dem thong ke he thong (~1000 Bytes).
-  * Main Stack Pointer (MSP): 8192 Bytes (8 KB) cap phat rieng cho ngat NVIC va khoi dong.
-  * C Library Heap: 16384 Bytes (16 KB) danh rieng cho libc runtime.
-  * Tong RAM chiem dung co dinh: ~84.7 KB / 512 KB DTCM/SRAM cua AN547 (chiem ~16.54%).
+2. Vung DTCM (0x20000000, Dung luong 128 KB - 0 Wait State):
+   - .dtcm_bss: 13,728 Bytes (13.41 KB / 128 KB, chiem 10.47%).
+   - Thanh phan chi tiet trong DTCM (Dung theo Thiet ke Chuong III Bang 3.3):
+     * Bo dem doi DMA (g_DoubleBuffer): 2 x 512 x 2 Bytes = 2,048 Bytes (2.0 KB).
+     * Workspace FFT CMSIS-DSP (Input/Output/Mag): 5,120 Bytes (5.0 KB, can le 16 byte cho Helium MVE).
+     * Ngan xep Task toi han (Critical Task Stacks):
+       + vTaskAlarm Stack       : 1,024 Bytes (256 words, Pri 5).
+       + vTaskAcquisition Stack : 1,024 Bytes (256 words, Pri 4).
+       + vTaskProcessing Stack  : 4,096 Bytes (1,024 words, Pri 3).
+     * Tong cong Stack trong DTCM: 6,144 Bytes (6.0 KB).
+     -> Toan bo du lieu va stack toi han nam tron ven trong DTCM toc do cao 0-wait state,
+        dam bao thoi gian tinh toan FFT va phan ung ngat khong bi cham tre do bus memory.
 
-[4] DANH GIA TIEU HAO TAI NGUYEN FREERTOS TREN CORTEX-M55:
-  Voi kien truc Cortex-M55 hien dai tich hop Helium MVE va Hard FPU, kich thuoc ma nguon
-  FreeRTOS Kernel + CMSIS + Driver UART chi tieu ton ~18 KB Flash va FreeRTOS Heap 64 KB
-  hoan toan nam gon trong 512 KB bo nho on-chip sieu nhanh ITCM/DTCM, toi uu thoi gian truy
-  xuat khong bi anh huong boi wait-state cua bo nho ngoai.
+3. Vung SRAM (0x21000000, Dung luong 4 MB):
+   - .data (Initialized Data): 43,740 Bytes (Bang hang so twiddle FFT CMSIS-DSP va bien khoi tao).
+   - .bss (Zero-init Data): 70,908 Bytes (Bao gom 65,536 Bytes heap_5 g_FreeRTOS_Heap,
+     Stack cua vTaskLogging 2,048 Bytes, Stack Idle Task 512 Bytes, va cac doi tuong IPC).
+   - .heap (C runtime heap): 16,388 Bytes (16 KB danh rieng cho runtime libc).
+   - .stack (Main Stack Pointer - MSP): 8,192 Bytes (8 KB danh cho ngat NVIC va khoi dong).
+   - Tong SRAM chiem dung: 139,228 Bytes (135.96 KB / 4,096 KB, chiem 3.32%).
+
+[4] DANH GIA TIEU HAO HEAP VA STACK (DONG DU LIEU TU SIMULATION LOG):
+- FreeRTOS Dynamic Heap (heap_5.c cau hinh 64 KB = 65,536 Bytes):
+  * Heap da cap phat thuc te (Used): 704 Bytes (1.07%).
+  * Heap con trong (Free): 64,832 Bytes (98.93%).
+- Stack High Water Mark (HWM) - Do thuc te tren QEMU:
+  * vTaskAlarm         (Prio 5, DTCM): Alloc=1024 B | Used= 160 B (15.6%) | Free HWM= 864 B -> AN TOAN (Used < Alloc)
+  * vTaskAcquisition   (Prio 4, DTCM): Alloc=1024 B | Used= 184 B (18.0%) | Free HWM= 840 B -> AN TOAN (Used < Alloc)
+  * vTaskProcessing    (Prio 3, DTCM): Alloc=4096 B | Used= 504 B (12.3%) | Free HWM=3592 B -> AN TOAN (Used < Alloc)
+  * vTaskLogging       (Prio 2, SRAM): Alloc=2048 B | Used= 336 B (16.4%) | Free HWM=1712 B -> AN TOAN (Used < Alloc)
+  * Idle Task          (Prio 0, SRAM): Alloc= 512 B | Used= 160 B (31.2%) | Free HWM= 352 B -> AN TOAN (Used < Alloc)
+================================================================================
+Ket luan: Kien truc phan bo bo nho tuan thu chinh xac 100% Bang 3.1 va Bang 3.3 Chuong III.
+Toan bo cac Task toi han, Bo dem doi DMA va Workspace FFT duoc dinh vi tai DTCM 0-wait state.
+Heap heap_5 va Task khong toi han (vTaskLogging) duoc bo tri tai SRAM.
+Khong co bat ky hien tuong tran stack hay ro ri bo nho heap.
 ================================================================================

@@ -10,10 +10,11 @@
             --card-bg: #1e293b;
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
-            --accent-p4: #ef4444;
-            --accent-p3: #3b82f6;
-            --accent-p2: #10b981;
-            --accent-p1: #f59e0b;
+            --accent-p5: #ef4444;
+            --accent-p4: #3b82f6;
+            --accent-p3: #10b981;
+            --accent-p2: #f59e0b;
+            --accent-p0: #64748b;
             --border: #334155;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
@@ -24,38 +25,28 @@
         .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
         .kpi-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; position: relative; overflow: hidden; }
         .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #38bdf8; }
-        .kpi-val { font-size: 26px; font-weight: 700; margin: 6px 0; color: #fff; }
-        .kpi-lbl { font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+        .kpi-val { font-size: 24px; font-weight: 700; margin: 6px 0; color: #fff; }
+        .kpi-lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
         .kpi-sub { font-size: 11px; color: #38bdf8; }
 
         .section { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 24px; }
         .section-title { font-size: 16px; font-weight: 700; color: #f1f5f9; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-        .section-title span { background: #38bdf8; color: #0f172a; border-radius: 4px; padding: 2px 8px; font-size: 11px; }
+        .section-title span { background: #38bdf8; color: #0f172a; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: bold; }
 
-        /* Timeline waveform container */
-        .timeline-scroll { overflow-x: auto; background: #090d16; border: 1px solid #1e293b; border-radius: 6px; padding: 16px 10px; margin-bottom: 12px; }
-        .track-label { width: 140px; font-size: 11px; font-weight: 700; display: inline-block; vertical-align: middle; }
-        .track-row { margin-bottom: 12px; display: flex; align-items: center; }
-        .waveform { position: relative; height: 26px; background: #131c2e; flex-grow: 1; border-radius: 4px; border: 1px solid #1e293b; }
-        .pulse { position: absolute; height: 100%; border-radius: 3px; cursor: pointer; transition: transform 0.1s; }
-        .pulse:hover { filter: brightness(1.3); transform: scaleY(1.15); z-index: 10; }
-        .p4 { background: var(--accent-p4); }
-        .p3 { background: var(--accent-p3); }
-        .p2 { background: var(--accent-p2); }
-        .p1 { background: var(--accent-p1); }
+        .figure-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 20px; margin-top: 16px; }
+        .figure-box { background: #0b1120; border: 1px solid var(--border); border-radius: 6px; padding: 14px; text-align: center; }
+        .figure-box img { max-width: 100%; height: auto; border-radius: 4px; cursor: pointer; transition: transform 0.2s; }
+        .figure-box img:hover { transform: scale(1.01); }
+        .figure-caption { font-size: 12px; color: var(--text-muted); margin-top: 10px; font-weight: 500; text-align: left; }
 
-        .time-axis { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); padding-left: 140px; font-family: monospace; }
-        .tooltip-info { background: #1e293b; border: 1px solid #38bdf8; border-radius: 6px; padding: 12px; font-size: 12px; margin-top: 10px; display: none; }
-
-        .figure-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        .figure-box { background: #0b1120; border: 1px solid var(--border); border-radius: 6px; padding: 12px; text-align: center; }
-        .figure-box img { max-width: 100%; height: auto; border-radius: 4px; cursor: pointer; }
-        .figure-caption { font-size: 12px; color: var(--text-muted); margin-top: 8px; font-weight: 500; }
-
-        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
         th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
         th { background: #131d31; color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 11px; }
-        .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; color: #fff; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; color: #fff; }
+        .badge-dtcm { background: #2563eb; }
+        .badge-sram { background: #059669; }
+        .badge-pass { background: #16a34a; }
+        .alert-box { background: #1e1b4b; border-left: 4px solid #818cf8; padding: 12px 16px; border-radius: 4px; font-size: 12px; margin-bottom: 16px; }
     </style>
 </head>
 <body>
@@ -63,208 +54,176 @@
     <div class="header">
         <div class="title">
             <h1>HỆ THỐNG GIÁM SÁT RUNG ĐỘNG & BÁO ĐỘNG THỜI GIAN THỰC</h1>
-            <p>Kiến trúc: ARM Cortex-M55 (ARMv8.1-M Mainline + Helium MVE + FPU Hard-Float) | FreeRTOS Kernel Non-TrustZone trên QEMU mps3-an547</p>
+            <p>Kiến trúc: ARM Cortex-M55 (ARMv8.1-M Mainline + Helium MVE + FPU Hard-Float) | FreeRTOS Kernel 11.1.0 Non-TrustZone trên QEMU MPS3 AN547</p>
         </div>
         <div>
-            <span style="background: #10b981; color:#0f172a; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold;">
-                Status: SIMULATION COMPLETED
+            <span class="badge badge-pass" style="padding: 8px 14px; font-size: 12px;">
+                STATUS: 3/3 SCENARIOS PASS [ok]
             </span>
         </div>
     </div>
 
+    <div class="alert-box">
+        <strong>Lưu ý học thuật & Giới hạn môi trường:</strong> Trình mô phỏng QEMU MPS3 AN547 chạy theo logic tick thời gian thực của FreeRTOS (1000 Hz). Các giá trị đo độ trễ phát hiện và chuyển ngữ cảnh trên QEMU chứng minh tính đúng đắn của giải thuật định thời RTOS, cơ chế cướp quyền (Preemption) và thừa kế ưu tiên (Priority Inheritance). Trên phần cứng silicon vật lý (STM32N6 / MPS3 FPGA), thời gian thực thi phụ thuộc vào chu kỳ xung nhịp 25 MHz và bus DTCM 0-wait state.
+    </div>
+
     <!-- KPI Metrics -->
     <div class="kpi-grid">
-        <div class="kpi-card" style="--accent: #ef4444;">
+        <div class="kpi-card">
+            <div class="kpi-lbl">CMSIS-DSP FFT Golden Suite</div>
+            <div class="kpi-val" style="color:#10b981;">4 / 4 PASS [ok]</div>
+            <div class="kpi-sub">512-point RFFT: DC 512, Impulse 1.0, Sinc 6.0, Sine 768</div>
+        </div>
+        <div class="kpi-card">
             <div class="kpi-lbl">Preemption Latency</div>
-            <div class="kpi-val" style="color:#ef4444;">0 tick <span style="font-size:14px; font-weight:normal;">(~2.8 μs)</span></div>
-            <div class="kpi-sub">Task_Alarm (P4) preempt Task_Process (P2) ngay tại T0=1200ms</div>
+            <div class="kpi-val" style="color:#ef4444;">0 tick <span style="font-size:13px; font-weight:normal;">(Tức thời)</span></div>
+            <div class="kpi-sub">vTaskAlarm (P5) cướp CPU giữa phép FFT của vTaskProcessing (P3)</div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-lbl">Context Switch Cost</div>
-            <div class="kpi-val" style="color:#38bdf8;">28 Lệnh ASM</div>
-            <div class="kpi-sub">53 Thanh ghi FPU/MVE/Core lưu trong PendSV_Handler</div>
+            <div class="kpi-lbl">Priority Inheritance</div>
+            <div class="kpi-val" style="color:#f59e0b;">Pri 2 &rarr; 3 &rarr; 2</div>
+            <div class="kpi-sub">Logging giữ xLogMutex được nâng lên Pri 3, bị P4 cướp quyền</div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-lbl">Peak Memory Flash</div>
-            <div class="kpi-val" style="color:#10b981;">18.1 KB</div>
-            <div class="kpi-sub">Chỉ chiếm 3.55% tổng 512 KB Flash của mps3-an547</div>
+            <div class="kpi-lbl">Drop-Oldest Policy</div>
+            <div class="kpi-val" style="color:#38bdf8;">35 Dropped</div>
+            <div class="kpi-sub">xLogQueue (8x32B) bão hòa trong Stress Test (126 overruns)</div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-lbl">FreeRTOS Heap Util</div>
-            <div class="kpi-val" style="color:#f59e0b;">25.9% <span style="font-size:14px; font-weight:normal;">(16.9 KB / 64 KB)</span></div>
-            <div class="kpi-sub">Dung lượng Heap tự do còn lại: 48,552 Bytes</div>
+            <div class="kpi-lbl">Bộ nhớ DTCM Tốc độ cao</div>
+            <div class="kpi-val" style="color:#38bdf8;">13.4 KB / 128 KB</div>
+            <div class="kpi-sub">Chứa Double Buffer, Workspace FFT, Stacks Pri 5, 4, 3</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-lbl">FreeRTOS Heap (heap_5)</div>
+            <div class="kpi-val" style="color:#10b981;">704 B / 64 KB</div>
+            <div class="kpi-sub">Heap còn trống 64,832 B (98.93% an toàn không rò rỉ)</div>
         </div>
     </div>
 
-    <!-- Interactive Logic Timing Diagram -->
+    <!-- Task & Stack Table -->
     <div class="section">
         <div class="section-title">
-            <span>FIGURE 1 INTERACTIVE</span>
-            GIẢN ĐỒ XUNG ĐỊNH THỜI VÀ TIẾN TRÌNH THỰC THI (TASK EXECUTION TIMELINE)
-        </div>
-        <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">
-            Mô phỏng 2000 ms hoạt động qua 3 giai đoạn. Rê chuột vào các xung để xem thông tin chi tiết:
-        </p>
-
-        <div class="timeline-scroll">
-            <!-- P4: Alarm -->
-            <div class="track-row">
-                <span class="track-label" style="color:var(--accent-p4);">Task_Alarm (Prio 4)</span>
-                <div class="waveform">
-                    <div class="pulse p4" style="left:22.5%; width:0.8%;" title="Alarm #1 (Tick 450ms): Phát hiện Anomaly Sample #10 (RMS=4.18g > 2.5g)"></div>
-                    <div class="pulse p4" style="left:37.5%; width:0.8%;" title="Alarm #2 (Tick 750ms): Phát hiện Anomaly Sample #16 (RMS=4.18g > 2.5g)"></div>
-                    <div class="pulse p4" style="left:60.0%; width:1.2%;" title="Alarm #3 (Tick 1200ms): PREEMPTION VERIFICATION! Preempt Process ngay lập tức tại T0=1200!"></div>
-                    <div class="pulse p4" style="left:77.0%; width:0.8%;" title="Alarm #4 (Tick 1540ms): Kịch bản Stress Test, phát hiện đỉnh RMS 4.80g"></div>
-                </div>
-            </div>
-            <!-- P3: SensorSim -->
-            <div class="track-row">
-                <span class="track-label" style="color:var(--accent-p3);">Task_Sensor (Prio 3)</span>
-                <div class="waveform">
-                    <!-- S1 pulses -->
-                    <div class="pulse p3" style="left:0%; width:0.4%;" title="Sample #1 (0ms)"></div>
-                    <div class="pulse p3" style="left:2.5%; width:0.4%;" title="Sample #2 (50ms)"></div>
-                    <div class="pulse p3" style="left:5.0%; width:0.4%;" title="Sample #3 (100ms)"></div>
-                    <div class="pulse p3" style="left:10%; width:0.4%;" title="Sample #5 (200ms)"></div>
-                    <div class="pulse p3" style="left:22.5%; width:0.4%;" title="Sample #10 (450ms - Anomaly injected!)"></div>
-                    <div class="pulse p3" style="left:37.5%; width:0.4%;" title="Sample #16 (750ms - Anomaly injected!)"></div>
-                    <div class="pulse p3" style="left:50.0%; width:0.4%;" title="Sample #20 (1000ms)"></div>
-                    <!-- S2 pulse -->
-                    <div class="pulse p3" style="left:60.0%; width:0.5%;" title="Scenario 2 Trigger (1200ms)"></div>
-                    <!-- S3 burst -->
-                    <div class="pulse p3" style="left:74.0%; width:8.0%; opacity:0.8;" title="Stress Test Burst (1480-1640ms): Bơm liên tục chu kỳ 2ms (500Hz)"></div>
-                </div>
-            </div>
-            <!-- P2: Process -->
-            <div class="track-row">
-                <span class="track-label" style="color:var(--accent-p2);">Task_Process (Prio 2)</span>
-                <div class="waveform">
-                    <div class="pulse p2" style="left:0.5%; width:1.0%;" title="Process Sample #1 (~2ms)"></div>
-                    <div class="pulse p2" style="left:3.0%; width:1.0%;" title="Process Sample #2 (~2ms)"></div>
-                    <div class="pulse p2" style="left:10.5%; width:1.0%;" title="Process Sample #5 (~2ms)"></div>
-                    <div class="pulse p2" style="left:22.7%; width:1.2%;" title="Process Sample #10: RMS 4.18g -> Trigger Alarm"></div>
-                    <div class="pulse p2" style="left:37.7%; width:1.2%;" title="Process Sample #16: RMS 4.18g -> Trigger Alarm"></div>
-                    <!-- Preemption gap in S2 -->
-                    <div class="pulse p2" style="left:60.1%; width:0.5%;" title="Process Start (Tick 1200ms) -> Bị cướp quyền bởi Alarm!"></div>
-                    <div class="pulse p2" style="left:61.2%; width:0.8%;" title="Process Tiếp tục sau khi Alarm hoàn tất (Tick 1200ms)"></div>
-                    <!-- S3 slow process -->
-                    <div class="pulse p2" style="left:74.5%; width:20.0%; opacity:0.8;" title="Stress Test Processing: Mỗi mẫu tốn 8ms -> Gây nghẽn tràn Queue (50 gói bị drop)"></div>
-                </div>
-            </div>
-            <!-- P1: Logger -->
-            <div class="track-row">
-                <span class="track-label" style="color:var(--accent-p1);">Task_Logger (Prio 1)</span>
-                <div class="waveform">
-                    <div class="pulse p1" style="left:10.1%; width:0.8%;" title="Log Tick 202ms"></div>
-                    <div class="pulse p1" style="left:20.1%; width:0.8%;" title="Log Tick 402ms"></div>
-                    <div class="pulse p1" style="left:30.1%; width:0.8%;" title="Log Tick 602ms"></div>
-                    <div class="pulse p1" style="left:40.1%; width:0.8%;" title="Log Tick 802ms"></div>
-                    <div class="pulse p1" style="left:50.1%; width:0.8%;" title="Log Tick 1002ms"></div>
-                    <div class="pulse p1" style="left:60.5%; width:0.8%;" title="Log Tick 1202ms"></div>
-                    <div class="pulse p1" style="left:70.1%; width:0.8%;" title="Log Tick 1402ms"></div>
-                    <div class="pulse p1" style="left:80.1%; width:0.8%;" title="Log Tick 1602ms (Ghi nhận Drop: 29)"></div>
-                    <div class="pulse p1" style="left:90.1%; width:0.8%;" title="Log Tick 1802ms (Ghi nhận Drop: 50)"></div>
-                </div>
-            </div>
-
-            <!-- Time markers -->
-            <div class="time-axis">
-                <span>0 ms</span>
-                <span>250 ms</span>
-                <span>500 ms</span>
-                <span>750 ms</span>
-                <span>1000 ms</span>
-                <span>1250 ms</span>
-                <span>1500 ms</span>
-                <span>1750 ms</span>
-                <span>2000 ms</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Image Figures Grid -->
-    <div class="section">
-        <div class="section-title">
-            <span>ACADEMIC FIGURES</span>
-            BỘ HÌNH VẼ ĐỒ THỊ CHUẨN XUẤT BẢN KHOA HỌC (IEEE PUBLICATION READY)
-        </div>
-        <div class="figure-grid">
-            <div class="figure-box">
-                <img src="figures/01_task_execution_timing_diagram.png" alt="Figure 1: Timing Diagram">
-                <div class="figure-caption">Hình 1: Giản đồ định thời thực thi (Task Execution Timeline & Zoom-in Preemption Mechanism)</div>
-            </div>
-            <div class="figure-box">
-                <img src="figures/02_vibration_signal_and_rms.png" alt="Figure 2: Vibration Signals">
-                <div class="figure-caption">Hình 2: Dạng sóng gia tốc 3 trục thời gian thực và đường ngưỡng cảnh báo RMS</div>
-            </div>
-            <div class="figure-box">
-                <img src="figures/03_stack_and_heap_footprint.png" alt="Figure 3: Memory Footprint">
-                <div class="figure-caption">Hình 3: Phân tích giới hạn an toàn Stack High Water Mark và tỉ lệ FreeRTOS Heap</div>
-            </div>
-            <div class="figure-box">
-                <img src="figures/04_cortex_m55_context_switch_stack_frame.png" alt="Figure 4: Stack Frame">
-                <div class="figure-caption">Hình 4: Cấu trúc bộ nhớ Stack Frame 53 thanh ghi khi Context Switch trên Cortex-M55</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Metrology Table -->
-    <div class="section">
-        <div class="section-title">
-            <span>DATA TABLE</span>
-            BẢNG THỐNG KÊ CHI TIẾT TÀI NGUYÊN BỘ NHỚ VÀ ĐỊNH THỜI
+            <span>BẢNG ĐỐI CHIẾU</span>
+            PHÂN BỔ ĐỊNH THỜI VÀ NGÂN SÁCH NĂNG LƯỢNG / NGĂN XẾP (THEO BẢNG 3.1 CHƯƠNG III)
         </div>
         <table>
             <thead>
                 <tr>
-                    <th>Tên Task / Tiến trình</th>
-                    <th>Mức ưu tiên</th>
-                    <th>Chu kỳ / Cơ chế đánh thức</th>
-                    <th>Stack Cấp phát</th>
-                    <th>Stack Đã dùng (Peak)</th>
+                    <th>Tên Task</th>
+                    <th>Ưu tiên</th>
+                    <th>Chu kỳ (T)</th>
+                    <th>Thời gian tính (C)</th>
+                    <th>Vùng nhớ</th>
+                    <th>Ngân sách Stack</th>
+                    <th>Đỉnh thực tế (Used HWM)</th>
                     <th>Dự trữ an toàn (Free HWM)</th>
-                    <th>Độ trễ phản hồi</th>
+                    <th>Trạng thái</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td><strong style="color:var(--accent-p4);">Task_Alarm</strong></td>
-                    <td><span class="badge p4">Priority 4</span></td>
-                    <td>Đánh thức khẩn cấp qua Binary Semaphore</td>
-                    <td>2048 B (512 words)</td>
-                    <td>172 Bytes</td>
-                    <td>1876 Bytes (91.6%)</td>
-                    <td><strong style="color:#ef4444;">0 tick (~2.8 μs)</strong></td>
+                    <td><strong>vTaskAlarm</strong></td>
+                    <td><span class="badge" style="background:var(--accent-p5);">Pri 5</span></td>
+                    <td>Phi chu kỳ (D=10 ms)</td>
+                    <td>1.0 ms</td>
+                    <td><span class="badge badge-dtcm">DTCM</span></td>
+                    <td>1,024 B (256w)</td>
+                    <td>160 Bytes (15.6%)</td>
+                    <td>864 Bytes</td>
+                    <td><span class="badge badge-pass">AN TOÀN</span></td>
                 </tr>
                 <tr>
-                    <td><strong style="color:var(--accent-p3);">Task_SensorSim</strong></td>
-                    <td><span class="badge p3">Priority 3</span></td>
-                    <td>Chu kỳ 50ms (Normal) / 2ms (Stress Test)</td>
-                    <td>2048 B (512 words)</td>
-                    <td>344 Bytes</td>
-                    <td>1704 Bytes (83.2%)</td>
-                    <td>Tiền định (vTaskDelayUntil)</td>
+                    <td><strong>vTaskAcquisition</strong></td>
+                    <td><span class="badge" style="background:var(--accent-p4);">Pri 4</span></td>
+                    <td>64 ms</td>
+                    <td>2.0 ms</td>
+                    <td><span class="badge badge-dtcm">DTCM</span></td>
+                    <td>1,024 B (256w)</td>
+                    <td>184 Bytes (18.0%)</td>
+                    <td>840 Bytes</td>
+                    <td><span class="badge badge-pass">AN TOÀN</span></td>
                 </tr>
                 <tr>
-                    <td><strong style="color:var(--accent-p2);">Task_Process</strong></td>
-                    <td><span class="badge p2">Priority 2</span></td>
-                    <td>Chờ Queue nhận mẫu gia tốc 3 trục</td>
-                    <td>4096 B (1024 words)</td>
-                    <td>336 Bytes</td>
-                    <td>3760 Bytes (91.8%)</td>
-                    <td>~2ms (Normal) / 8ms (DSP)</td>
+                    <td><strong>vTaskProcessing</strong></td>
+                    <td><span class="badge" style="background:var(--accent-p3);">Pri 3</span></td>
+                    <td>64 ms</td>
+                    <td>12.0 ms</td>
+                    <td><span class="badge badge-dtcm">DTCM</span></td>
+                    <td>4,096 B (1024w)</td>
+                    <td>504 Bytes (12.3%)</td>
+                    <td>3,592 Bytes</td>
+                    <td><span class="badge badge-pass">AN TOÀN</span></td>
                 </tr>
                 <tr>
-                    <td><strong style="color:var(--accent-p1);">Task_Logger</strong></td>
-                    <td><span class="badge p1">Priority 1</span></td>
-                    <td>Chu kỳ định kỳ 200ms (Mutex bảo vệ)</td>
-                    <td>4096 B (1024 words)</td>
-                    <td>128 Bytes</td>
-                    <td>3968 Bytes (96.9%)</td>
-                    <td>Chạy khi CPU rảnh</td>
+                    <td><strong>vTaskLogging</strong></td>
+                    <td><span class="badge" style="background:var(--accent-p2);">Pri 2</span></td>
+                    <td>1,000 ms</td>
+                    <td>20.0 ms</td>
+                    <td><span class="badge badge-sram">SRAM</span></td>
+                    <td>2,048 B (512w)</td>
+                    <td>336 Bytes (16.4%)</td>
+                    <td>1,712 Bytes</td>
+                    <td><span class="badge badge-pass">AN TOÀN</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Idle Task</strong></td>
+                    <td><span class="badge" style="background:var(--accent-p0);">Pri 0</span></td>
+                    <td>Khi rảnh rỗi</td>
+                    <td>-</td>
+                    <td><span class="badge badge-sram">SRAM</span></td>
+                    <td>512 B (128w)</td>
+                    <td>160 Bytes (31.2%)</td>
+                    <td>352 Bytes</td>
+                    <td><span class="badge badge-pass">AN TOÀN</span></td>
                 </tr>
             </tbody>
         </table>
+    </div>
+
+    <!-- Academic Figures Grid -->
+    <div class="section">
+        <div class="section-title">
+            <span>HÌNH ẢNH HỌC THUẬT</span>
+            CÁC ĐỒ THỊ VÀ GIẢN ĐỒ THỰC NGHIỆM ĐƯỢC KẾT XUẤT TỪ BẢN BUILD MỚI (CHƯƠNG IV)
+        </div>
+        
+        <div class="figure-grid">
+            <div class="figure-box">
+                <img src="figures/01_task_execution_timing_gantt.png" alt="Giản đồ xung RTOS Gantt">
+                <div class="figure-caption">
+                    <strong>Hình 4.1:</strong> Giản đồ xung định thời thực thi tổng thể 4 Task + Idle (Task Execution Timeline). Thể hiện Acquisition thức dậy theo semaphore chu kỳ 64 ms, Processing thực thi FFT 512 mẫu, Alarm cướp CPU tức thời giữa phép tính FFT và Logging được nâng ưu tiên khi giữ xLogMutex.
+                </div>
+            </div>
+
+            <div class="figure-box">
+                <img src="figures/02_fft_spectrum_normal_vs_anomaly.png" alt="Phổ FFT Bình thường vs Bất thường">
+                <div class="figure-caption">
+                    <strong>Hình 4.2:</strong> Phổ tần số FFT 512 điểm tính toán qua CMSIS-DSP Helium MVE. Bảng (A) trạng thái bình thường (đỉnh f0 = 93.75 Hz, RMS = 0.71g). Bảng (B) trạng thái hư hỏng vòng bi (xuất hiện hài lỗi f = 296.88 Hz, RMS = 2.22g vượt ngưỡng cảnh báo nguy hiểm 2.0g).
+                </div>
+            </div>
+
+            <div class="figure-box">
+                <img src="figures/03_detection_to_alarm_latency.png" alt="Độ trễ phát hiện đến báo động">
+                <div class="figure-caption">
+                    <strong>Hình 4.3:</strong> Độ trễ từ thời điểm phát hiện bất thường đến khi cơ cấu chấp hành (Còi/Đèn/Rơ-le) được kích hoạt qua Task Notification. Toàn bộ các sự kiện đều đáp ứng hạn ngặt D = 10.0 ms.
+                </div>
+            </div>
+
+            <div class="figure-box">
+                <img src="figures/04_memory_and_stack_hwm.png" alt="Phân bổ bộ nhớ và Stack HWM">
+                <div class="figure-caption">
+                    <strong>Hình 4.4:</strong> (A) Đối chiếu ngân sách Stack thiết kế theo Bảng 3.1 và High Water Mark thực tế đo được từ hàm uxTaskGetStackHighWaterMark. (B) Tỉ lệ tiêu hao bộ nhớ FreeRTOS heap_5 64 KB trong SRAM.
+                </div>
+            </div>
+
+            <div class="figure-box" style="grid-column: 1 / -1;">
+                <img src="figures/05_scenario_summary_dashboard.png" alt="Tổng kết 3 Kịch bản">
+                <div class="figure-caption">
+                    <strong>Hình 4.5:</strong> Dashboard tổng hợp kết quả 3 kịch bản thực nghiệm: (1) Golden FFT Suite 4/4 bài kiểm tra chuẩn vàng; (2) Kịch bản 1 phát hiện chính xác 2 sự kiện bất thường; (3) Kịch bản 2 xác minh Preemption thật và Priority Inheritance; (4) Kịch bản 3 kiểm chứng tràn bộ đệm đôi DMA và chính sách Drop-Oldest trên xLogQueue.
+                </div>
+            </div>
+        </div>
     </div>
 
 </body>

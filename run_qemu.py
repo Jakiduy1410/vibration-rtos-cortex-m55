@@ -7,10 +7,11 @@ env['PATH'] = r'C:\msys64\ucrt64\bin;C:\msys64\usr\bin;' + env.get('PATH', '')
 
 cmd = [
     'qemu-system-arm',
-    '-M', 'mps3-an547',
+    '-machine', 'mps3-an547',
     '-cpu', 'cortex-m55',
     '-nographic',
     '-semihosting',
+    '-serial', 'stdio',
     '-kernel', 'build/firmware.elf'
 ]
 
