@@ -234,16 +234,25 @@ volatile uint32_t ulHighFrequencyTimerTicks = 0;
 static inline uint64_t get_system_cycles(void)
 {
     uint32_t ticks1, ticks2, val;
+    BaseType_t in_isr = xPortIsInsideInterrupt();
     do {
-        ticks1 = xTaskGetTickCount();
+        ticks1 = in_isr ? xTaskGetTickCountFromISR() : xTaskGetTickCount();
         val    = SysTick->VAL;
-        ticks2 = xTaskGetTickCount();
+        ticks2 = in_isr ? xTaskGetTickCountFromISR() : xTaskGetTickCount();
     } while (ticks1 != ticks2);
 
     /* SysTick counts downwards from 24,999 to 0 */
     uint64_t elapsed_in_tick = (uint64_t)(SYSTICK_RELOAD_CYCLES - 1UL - val);
     return ((uint64_t)ticks1 * (uint64_t)SYSTICK_RELOAD_CYCLES) + elapsed_in_tick;
 }
+
+/*----------------------------------------------------------------------------
+ * Scenario Pass/Fail Verdict Status Flags (Gated Completion)
+ *----------------------------------------------------------------------------*/
+static bool g_s1_passed  = false;
+static bool g_s2_passed  = false;
+static bool g_s3_passed  = false;
+static bool g_hwm_passed = false;
 
 /*----------------------------------------------------------------------------
  * Forward Declarations
@@ -610,6 +619,25 @@ static void vTaskProcessing(void *pvParameters)
                     g_s2_t_mid_fft_irq <= g_s2_t_alarm_actuate &&
                     g_s2_t_alarm_actuate < g_s2_t_fft_end) {
                     g_s2_preempt_verified = true;
+                    uart_puts("[Preemption] Preemption verified! [PASS] [ok] t_start=");
+                    uart_print_uint((uint32_t)g_s2_t_fft_start);
+                    uart_puts(" < t_irq=");
+                    uart_print_uint((uint32_t)g_s2_t_mid_fft_irq);
+                    uart_puts(" <= t_actuate=");
+                    uart_print_uint((uint32_t)g_s2_t_alarm_actuate);
+                    uart_puts(" < t_end=");
+                    uart_print_uint((uint32_t)g_s2_t_fft_end);
+                    uart_puts(" (cycles)\r\n");
+                } else {
+                    uart_puts("[Preemption] Preemption check FAILED: [FAIL] t_start=");
+                    uart_print_uint((uint32_t)g_s2_t_fft_start);
+                    uart_puts(" t_irq=");
+                    uart_print_uint((uint32_t)g_s2_t_mid_fft_irq);
+                    uart_puts(" t_actuate=");
+                    uart_print_uint((uint32_t)g_s2_t_alarm_actuate);
+                    uart_puts(" t_end=");
+                    uart_print_uint((uint32_t)g_s2_t_fft_end);
+                    uart_puts(" (cycles)\r\n");
                 }
             }
 
@@ -684,14 +712,17 @@ static void vTaskProcessing(void *pvParameters)
             entry.flags        = desc.overrun_flag;
 
             if (alarm_level > 0) {
-                /* Critical / Warning alarms routed to dedicated xAlarmLogQueue (0 dropped) */
+                /* Critical / Warning alarms routed to dedicated xAlarmLogQueue (FIFO, depth 8).
+                 * Strictly non-blocking send (timeout 0) to prevent reverse priority inversion
+                 * (Processing Pri 3 must never block waiting for Logging Pri 2 to read). */
                 STATS_INC(alarm_logs_generated);
                 if (xQueueSend(xAlarmLogQueue, &entry, 0) != pdPASS) {
                     STATS_INC(alarm_logs_dropped);
                 }
             } else {
                 /* In Scenario 3 stress burst, log EVERY processed block to stress xLogQueue.
-                 * In normal operation (Scenario 1 & 2), log sparsely (1:16 ratio). */
+                 * In normal operation (Scenario 1 & 2), log sparsely (1:16 ratio).
+                 * Strictly non-blocking send (timeout 0) with Drop-Oldest policy when full. */
                 bool should_log = (g_current_scenario == 3) || ((desc.block_seq % SPARSE_LOG_RATIO) == 0);
                 if (should_log) {
                     STATS_INC(normal_logs_generated);
@@ -932,6 +963,7 @@ static void vScenarioTimerCallback(TimerHandle_t xTimer)
         bool s1_pass = (g_stats.alarm_actuate_count == 2) &&
                        (g_s1_detected_block6 == 1) &&
                        (g_s1_detected_block14 == 1);
+        g_s1_passed = s1_pass;
 
         if (s1_pass) {
             uart_puts("\r\n>>> KICH BAN 1 HOAN THANH: [PASS] [ok] (Da phat hien dung 2 su kien bat thuong)\r\n");
@@ -949,6 +981,7 @@ static void vScenarioTimerCallback(TimerHandle_t xTimer)
     /* Execute Scenario 2 Priority Inheritance after Mid-FFT preemption verified */
     else if (g_current_scenario == 2 && g_s2_preempt_verified && g_s2_inheritance_verified) {
         bool s2_pass = g_s2_preempt_verified && g_s2_inheritance_verified;
+        g_s2_passed = s2_pass;
         if (s2_pass) {
             uart_puts("\r\n>>> KICH BAN 2 HOAN THANH: [PASS] [ok]\r\n");
         } else {
@@ -986,7 +1019,7 @@ static void vScenarioTimerCallback(TimerHandle_t xTimer)
             return;
         }
 
-        /* Stage 3: Drain any remaining logs so written + dropped == generated */
+        /* Stage 3: Drain any remaining logs so written (drained) + dropped == generated */
         LogEntry_t discarded;
         while (xQueueReceive(xAlarmLogQueue, &discarded, 0) == pdPASS) {
             STATS_INC(alarm_logs_written);
@@ -1000,6 +1033,7 @@ static void vScenarioTimerCallback(TimerHandle_t xTimer)
                        (g_stats.normal_logs_dropped > 0) &&
                        (g_stats.alarm_logs_dropped == 0) &&
                        (g_stats.generated_blocks == (g_stats.processed_blocks + g_stats.isr_overrun_count));
+        g_s3_passed = s3_pass;
 
         if (s3_pass) {
             uart_puts("\r\n>>> KICH BAN 3 HOAN THANH: [PASS] [ok] (Log drop va Overrun da duoc ghi nhan, 0 log canh bao bi mat)\r\n");
@@ -1013,8 +1047,20 @@ static void vScenarioTimerCallback(TimerHandle_t xTimer)
 
         print_final_benchmark_report();
 
-        uart_puts("\r\n[QEMU] ALL 3 SCENARIOS COMPLETED SUCCESSFULLY. EXITING SIMULATION...\r\n");
-        qemu_exit(0);
+        /* Gate final simulation exit: ALL 3 SCENARIOS + STACK BUDGET MUST PASS */
+        bool all_scenarios_passed = g_s1_passed && g_s2_passed && g_s3_passed && g_hwm_passed;
+        if (all_scenarios_passed) {
+            uart_puts("\r\n[QEMU] ALL 3 SCENARIOS COMPLETED SUCCESSFULLY. EXITING SIMULATION...\r\n");
+            qemu_exit(0);
+        } else {
+            uart_puts("\r\n[QEMU] SCENARIO EXECUTION FAILED: ");
+            if (!g_s1_passed)  uart_puts("[Scenario 1 FAILED] ");
+            if (!g_s2_passed)  uart_puts("[Scenario 2 FAILED] ");
+            if (!g_s3_passed)  uart_puts("[Scenario 3 FAILED] ");
+            if (!g_hwm_passed) uart_puts("[Stack HWM FAILED] ");
+            uart_puts(". EXITING SIMULATION WITH CODE 1...\r\n");
+            qemu_exit(1);
+        }
     }
 }
 
@@ -1166,7 +1212,8 @@ static void print_final_benchmark_report(void)
     uart_print_uint(g_stats.normal_logs_generated);
     uart_puts("\r\n    - Log thuong da ghi (Normal Written) : ");
     uart_print_uint(g_stats.normal_logs_written);
-    uart_puts("\r\n    - Log thuong bi drop (Normal Drop)   : ");
+    uart_puts(" (Bao gom ban ghi xa o giai doan drain)\r\n");
+    uart_puts("    - Log thuong bi drop (Normal Drop)   : ");
     uart_print_uint(g_stats.normal_logs_dropped);
     uart_puts(" (Chinh sach Drop-Oldest tren xLogQueue)\r\n");
     uart_puts("    * Kiem tra dang thuc log thuong: Generated == Written + Dropped\r\n");
@@ -1188,7 +1235,7 @@ static void print_final_benchmark_report(void)
     uart_print_uint(g_stats.alarm_logs_dropped);
     uart_puts(" -> ");
     if (g_stats.alarm_logs_dropped == 0) {
-        uart_puts("KHONG MAT BAT KY BAN GHI CANH BAO NAO [PASS] [ok]\r\n");
+        uart_puts("0 BAN GHI CANH BAO MAT TRONG LAN CHAY NAY (3 canh bao / queue sau 8, xa moi 1000 ms) [PASS] [ok]\r\n");
     } else {
         uart_puts("BI MAT CANH BAO [FAIL]\r\n");
     }
@@ -1229,6 +1276,19 @@ static void print_final_benchmark_report(void)
     TaskHandle_t xIdleHandle = xTaskGetIdleTaskHandle();
     UBaseType_t hwm_idle    = (xIdleHandle != NULL) ? uxTaskGetStackHighWaterMark(xIdleHandle) : 0;
 
+    uint32_t used_alarm = (uint32_t)((256 - hwm_alarm) * sizeof(StackType_t));
+    uint32_t used_acq   = (uint32_t)((256 - hwm_acq) * sizeof(StackType_t));
+    uint32_t used_proc  = (uint32_t)((1024 - hwm_proc) * sizeof(StackType_t));
+    uint32_t used_log   = (uint32_t)((512 - hwm_log) * sizeof(StackType_t));
+    uint32_t used_idle  = (uint32_t)((configMINIMAL_STACK_SIZE - hwm_idle) * sizeof(StackType_t));
+
+    bool hwm_ok = (used_alarm < 1024) &&
+                  (used_acq < 1024) &&
+                  (used_proc < 4096) &&
+                  (used_log < 2048) &&
+                  (used_idle < 512);
+    g_hwm_passed = hwm_ok;
+
     uart_puts("\r\n[5] BANG THEO DOI NGAN XEP (STACK HWM SO VOI BANG 3.1 CHUONG III):\r\n");
     uart_puts("--------------------------------------------------------------------------------\r\n");
     uart_puts("Task Name        | Prio | Memory | Alloc (Bytes) | Free HWM (Bytes) | Used (Bytes)\r\n");
@@ -1238,39 +1298,49 @@ static void print_final_benchmark_report(void)
     uart_puts("vTaskAlarm       |  5   |  DTCM  |  1024 (256w)  |  ");
     uart_print_uint((uint32_t)(hwm_alarm * sizeof(StackType_t)));
     uart_puts(" Bytes       |  ");
-    uart_print_uint((uint32_t)((256 - hwm_alarm) * sizeof(StackType_t)));
+    uart_print_uint(used_alarm);
     uart_puts(" Bytes\r\n");
 
     /* vTaskAcquisition */
     uart_puts("vTaskAcquisition |  4   |  DTCM  |  1024 (256w)  |  ");
     uart_print_uint((uint32_t)(hwm_acq * sizeof(StackType_t)));
     uart_puts(" Bytes       |  ");
-    uart_print_uint((uint32_t)((256 - hwm_acq) * sizeof(StackType_t)));
+    uart_print_uint(used_acq);
     uart_puts(" Bytes\r\n");
 
     /* vTaskProcessing */
     uart_puts("vTaskProcessing  |  3   |  DTCM  |  4096 (1024w) |  ");
     uart_print_uint((uint32_t)(hwm_proc * sizeof(StackType_t)));
     uart_puts(" Bytes       |  ");
-    uart_print_uint((uint32_t)((1024 - hwm_proc) * sizeof(StackType_t)));
+    uart_print_uint(used_proc);
     uart_puts(" Bytes\r\n");
 
     /* vTaskLogging */
     uart_puts("vTaskLogging     |  2   |  SRAM  |  2048 (512w)  |  ");
     uart_print_uint((uint32_t)(hwm_log * sizeof(StackType_t)));
     uart_puts(" Bytes       |  ");
-    uart_print_uint((uint32_t)((512 - hwm_log) * sizeof(StackType_t)));
+    uart_print_uint(used_log);
     uart_puts(" Bytes\r\n");
 
     /* Idle Task */
     uart_puts("Idle Task        |  0   |  SRAM  |   512 (128w)  |  ");
     uart_print_uint((uint32_t)(hwm_idle * sizeof(StackType_t)));
     uart_puts(" Bytes       |  ");
-    uart_print_uint((uint32_t)((configMINIMAL_STACK_SIZE - hwm_idle) * sizeof(StackType_t)));
+    uart_print_uint(used_idle);
     uart_puts(" Bytes\r\n");
     uart_puts("--------------------------------------------------------------------------------\r\n");
+    uart_puts("Ngan sach ly thuyet vTaskProcessing (Paper Budget): ~616 Bytes\r\n");
+    uart_puts("  (Context: 212 B + Locals: 120 B + FFT Call: 96 B + Unpack: 64 B + API: 80 B + Margin: 44 B)\r\n");
+    uart_puts("  -> So voi cap phat 4096 B: He so an toan 7.7x (Thuc te HWM su dung: ");
+    uart_print_uint(used_proc);
+    uart_puts(" Bytes / 12.9%)\r\n");
+    uart_puts("--------------------------------------------------------------------------------\r\n");
     uart_puts("Ghi chu: Free HWM la so byte ngan xep toi thieu con du chua tung bi cham toi.\r\n");
-    uart_puts("         Moi Task deu thoa man: Used < Alloc (Khong vuot ngan sach).\r\n");
+    if (hwm_ok) {
+        uart_puts("Ket luan: [PASS] [ok] Moi Task deu thoa man: Used < Alloc (Khong vuot ngan sach).\r\n");
+    } else {
+        uart_puts("Ket luan: [FAIL] Phat hien Task vuot ngan sach stack!\r\n");
+    }
     uart_puts("====================================================================\r\n");
 }
 

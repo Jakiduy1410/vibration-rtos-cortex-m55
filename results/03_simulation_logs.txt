@@ -65,11 +65,11 @@ QEMU 11.0.1 monitor - type 'help' for more information
 
 
 
->>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 cycles (0.00 us) | Tick=384 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=8694 cycles (347.76 us) | Tick=384 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
 
 
 
->>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=3004 cycles (120.16 us) | Tick=896 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=3174 cycles (126.95 us) | Tick=896 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
 
 
 
@@ -97,7 +97,7 @@ QEMU 11.0.1 monitor - type 'help' for more information
 
 
 
---- [LOGGER TELEMETRY @ 2001 ms] ---
+--- [LOGGER TELEMETRY @ 2002 ms] ---
 
   [ENTRY #16] T=1024ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
 
@@ -105,39 +105,9 @@ QEMU 11.0.1 monitor - type 'help' for more information
 
 
 
->>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 cycles (0.00 us) | Tick=2048 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=4150 cycles (166.00 us) | Tick=2048 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
 
-
-
->>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 cycles (0.00 us) | Tick=2112 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
-
-
-
->>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 cycles (0.00 us) | Tick=2176 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
-
-
-
->>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 cycles (0.00 us) | Tick=2240 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
-
-
-
->>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 cycles (0.00 us) | Tick=2304 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
-
-
-
->>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 cycles (0.00 us) | Tick=2368 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
-
-
-
->>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 cycles (0.00 us) | Tick=2432 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
-
-
-
->>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 cycles (0.00 us) | Tick=2496 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
-
-
-
->>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=477 cycles (19.07 us) | Tick=2560 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+[Preemption] Preemption verified! [PASS] [ok] t_start=51210956 < t_irq=51220848 <= t_actuate=51224998 < t_end=51241696 (cycles)
 
 
 
@@ -163,11 +133,11 @@ QEMU 11.0.1 monitor - type 'help' for more information
 
 
 
---- [LOGGER TELEMETRY @ 2562 ms] ---
+--- [LOGGER TELEMETRY @ 2050 ms] ---
 
   [ENTRY #32] T=2048ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
 
-  >> Gen: 41 | Proc: 41 | Overruns: 0 | QueueDrop: 0 | Alarms: 11 | LogDrop: 0 | AlarmDrop: 0 | FreeHeap: 64368 B
+  >> Gen: 33 | Proc: 33 | Overruns: 0 | QueueDrop: 0 | Alarms: 3 | LogDrop: 0 | AlarmDrop: 0 | FreeHeap: 64368 B
 
 
 
@@ -185,31 +155,55 @@ QEMU 11.0.1 monitor - type 'help' for more information
 
 
 
->>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 cycles (0.00 us) | Tick=2628 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=0 cycles (0.00 us) | Tick=2236 ms | Actuation: BUZZER_ON + RELAY_TRIP <<<
+
+
+
+--- [LOGGER TELEMETRY @ 3051 ms] ---
+
+  [ALARM ENTRY #65] T=2228ms | RMS=2.23g | Peak=3.99g | CF=1.78 | Freq=296.8Hz (Bin 19) | Level=2 [CRITICAL_ALARM]
+
+  [ENTRY #257] T=2996ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+
+  [ENTRY #258] T=3000ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+
+  [ENTRY #259] T=3004ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+
+  [ENTRY #262] T=3016ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+
+  [ENTRY #263] T=3020ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+
+  [ENTRY #264] T=3024ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+
+  [ENTRY #265] T=3028ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+
+  [ENTRY #268] T=3040ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+
+  [ENTRY #269] T=3044ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+
+  >> Gen: 270 | Proc: 191 | Overruns: 78 | QueueDrop: 0 | Alarms: 4 | LogDrop: 148 | AlarmDrop: 0 | FreeHeap: 64368 B
 
 
 
 --- [LOGGER TELEMETRY @ 3500 ms] ---
 
-  [ALARM ENTRY #45] T=2616ms | RMS=2.23g | Peak=3.99g | CF=1.78 | Freq=296.8Hz (Bin 19) | Level=2 [CRITICAL_ALARM]
+  [ENTRY #346] T=3352ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
 
-  [ENTRY #229] T=3352ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+  [ENTRY #347] T=3356ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
 
-  [ENTRY #230] T=3356ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+  [ENTRY #348] T=3360ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
 
-  [ENTRY #231] T=3360ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+  [ENTRY #349] T=3364ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
 
-  [ENTRY #234] T=3372ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+  [ENTRY #352] T=3376ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
 
-  [ENTRY #235] T=3376ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+  [ENTRY #353] T=3380ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
 
-  [ENTRY #236] T=3380ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+  [ENTRY #354] T=3384ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
 
-  [ENTRY #237] T=3384ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
+  [ENTRY #355] T=3388ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
 
-  [ENTRY #240] T=3396ms | RMS=0.70g | Peak=1.00g | CF=1.41 | Freq=93.7Hz (Bin 6) | Level=0 [NORMAL_SPARSE]
-
-  >> Gen: 240 | Proc: 174 | Overruns: 66 | QueueDrop: 0 | Alarms: 12 | LogDrop: 124 | AlarmDrop: 0 | FreeHeap: 64368 B
+  >> Gen: 357 | Proc: 249 | Overruns: 108 | QueueDrop: 0 | Alarms: 4 | LogDrop: 198 | AlarmDrop: 0 | FreeHeap: 64368 B
 
 
 
@@ -225,43 +219,43 @@ QEMU 11.0.1 monitor - type 'help' for more information
 
 [1] THONG KE KHOI DU LIEU VA LOG (DANG THUC TOAN HOC):
 
-    - Tong so khoi sinh ra (Generated)   : 240
+    - Tong so khoi sinh ra (Generated)   : 357
 
-    - Tong so khoi da xu ly (Processed)  : 174
+    - Tong so khoi da xu ly (Processed)  : 249
 
-    - So lan tran bo dem DMA (Overrun)   : 66
+    - So lan tran bo dem DMA (Overrun)   : 108
 
     * Kiem tra dang thuc khoi: Generated == Processed + Overrun
 
-      (240 == 240) -> DANG THUC DUNG [PASS] [ok]
+      (357 == 357) -> DANG THUC DUNG [PASS] [ok]
 
 
 
 [2] PHAN TACH HANG DOI LOG THUONG VA LOG CANH BAO:
 
-    - Log thuong sinh ra (Normal Gen)    : 134
+    - Log thuong sinh ra (Normal Gen)    : 217
 
-    - Log thuong da ghi (Normal Written) : 10
+    - Log thuong da ghi (Normal Written) : 19 (Bao gom ban ghi xa o giai doan drain)
 
-    - Log thuong bi drop (Normal Drop)   : 124 (Chinh sach Drop-Oldest tren xLogQueue)
+    - Log thuong bi drop (Normal Drop)   : 198 (Chinh sach Drop-Oldest tren xLogQueue)
 
     * Kiem tra dang thuc log thuong: Generated == Written + Dropped
 
-      (134 == 134) -> DANG THUC DUNG [PASS] [ok]
+      (217 == 217) -> DANG THUC DUNG [PASS] [ok]
 
     - Log canh bao sinh (Alarm Gen)      : 3
 
     - Log canh bao da ghi (Alarm Written): 3
 
-    - Log canh bao bi drop (Alarm Drop)  : 0 -> KHONG MAT BAT KY BAN GHI CANH BAO NAO [PASS] [ok]
+    - Log canh bao bi drop (Alarm Drop)  : 0 -> 0 BAN GHI CANH BAO MAT TRONG LAN CHAY NAY (3 canh bao / queue sau 8, xa moi 1000 ms) [PASS] [ok]
 
 
 
 [3] DO TRE PHAT HIEN -> BAO DONG (DO CHU KY SYSTICK):
 
-    - Do tre cuc dai (Max Latency)       : 3004 cycles (120.16 us)
+    - Do tre cuc dai (Max Latency)       : 8694 cycles (347.76 us)
 
-    - Do tre trung binh (Mean Latency)   : 290 cycles (11.60 us)
+    - Do tre trung binh (Mean Latency)   : 4004 cycles (160.16 us)
 
     * Ghi chu hoc thuat: So lieu do bang SysTick tren QEMU MPS3 AN547 (25 MHz).
 
@@ -289,9 +283,9 @@ Task Name        | Prio | Memory | Alloc (Bytes) | Free HWM (Bytes) | Used (Byte
 
 vTaskAlarm       |  5   |  DTCM  |  1024 (256w)  |  712 Bytes       |  312 Bytes
 
-vTaskAcquisition |  4   |  DTCM  |  1024 (256w)  |  828 Bytes       |  196 Bytes
+vTaskAcquisition |  4   |  DTCM  |  1024 (256w)  |  840 Bytes       |  184 Bytes
 
-vTaskProcessing  |  3   |  DTCM  |  4096 (1024w) |  3568 Bytes       |  528 Bytes
+vTaskProcessing  |  3   |  DTCM  |  4096 (1024w) |  3576 Bytes       |  520 Bytes
 
 vTaskLogging     |  2   |  SRAM  |  2048 (512w)  |  1704 Bytes       |  344 Bytes
 
@@ -299,9 +293,17 @@ Idle Task        |  0   |  SRAM  |   512 (128w)  |  352 Bytes       |  160 Bytes
 
 --------------------------------------------------------------------------------
 
+Ngan sach ly thuyet vTaskProcessing (Paper Budget): ~616 Bytes
+
+  (Context: 212 B + Locals: 120 B + FFT Call: 96 B + Unpack: 64 B + API: 80 B + Margin: 44 B)
+
+  -> So voi cap phat 4096 B: He so an toan 7.7x (Thuc te HWM su dung: 520 Bytes / 12.9%)
+
+--------------------------------------------------------------------------------
+
 Ghi chu: Free HWM la so byte ngan xep toi thieu con du chua tung bi cham toi.
 
-         Moi Task deu thoa man: Used < Alloc (Khong vuot ngan sach).
+Ket luan: [PASS] [ok] Moi Task deu thoa man: Used < Alloc (Khong vuot ngan sach).
 
 ====================================================================
 

@@ -60,9 +60,11 @@ if table_match:
 m_heap_tot = re.search(r'Tong dung luong Heap cau hinh\s*:\s*(\d+)', log_text)
 m_heap_free = re.search(r'Heap con trong hien tai \(Free\)\s*:\s*(\d+)', log_text)
 m_heap_used = re.search(r'Heap da cap phat thuc te \(Used\)\s*:\s*(\d+)', log_text)
-heap_total = int(m_heap_tot.group(1)) if m_heap_tot else 65536
-heap_free = int(m_heap_free.group(1)) if m_heap_free else 64832
-heap_used = int(m_heap_used.group(1)) if m_heap_used else 704
+if not (m_heap_tot and m_heap_free and m_heap_used):
+    raise ValueError("Missing FreeRTOS heap statistics in simulation log!")
+heap_total = int(m_heap_tot.group(1))
+heap_free = int(m_heap_free.group(1))
+heap_used = int(m_heap_used.group(1))
 
 # Extract all alarm events from log with cycle and microsecond precision
 alarm_events = []
@@ -73,35 +75,42 @@ for m in re.finditer(r'\[EMERGENCY ALARM ACTUATED\] Level=(\d+) \| Latency=(\d+)
         'us': float(m.group(3)),
         'tick': int(m.group(4))
     })
+if not alarm_events:
+    raise ValueError("No emergency alarm actuation events found in simulation log!")
 
 # Extract latency stats
 m_max_lat = re.search(r'Do tre cuc dai \(Max Latency\)\s*:\s*(\d+) cycles \(([\d\.]+) us\)', log_text)
 m_mean_lat = re.search(r'Do tre trung binh \(Mean Latency\)\s*:\s*(\d+) cycles \(([\d\.]+) us\)', log_text)
-max_lat_cyc = int(m_max_lat.group(1)) if m_max_lat else 9530
-max_lat_us = float(m_max_lat.group(2)) if m_max_lat else 381.20
-mean_lat_cyc = int(m_mean_lat.group(1)) if m_mean_lat else 3055
-mean_lat_us = float(m_mean_lat.group(2)) if m_mean_lat else 122.19
+if not (m_max_lat and m_mean_lat):
+    raise ValueError("Missing latency statistics in simulation log!")
+max_lat_cyc = int(m_max_lat.group(1))
+max_lat_us = float(m_max_lat.group(2))
+mean_lat_cyc = int(m_mean_lat.group(1))
+mean_lat_us = float(m_mean_lat.group(2))
 
 # Extract Totals
 m_gen = re.search(r'Tong so khoi sinh ra \(Generated\)\s*:\s*(\d+)', log_text)
 m_proc = re.search(r'Tong so khoi da xu ly \(Processed\)\s*:\s*(\d+)', log_text)
 m_overrun = re.search(r'So lan tran bo dem DMA \(Overrun\)\s*:\s*(\d+)', log_text)
 m_norm_gen = re.search(r'Log thuong sinh ra \(Normal Gen\)\s*:\s*(\d+)', log_text)
-m_norm_wr = re.search(r'Log thuong da ghi \(Normal Written\)\s*:\s*(\d+)', log_text)
+m_norm_wr = re.search(r'Log thuong da ghi \(Normal Written.*?\)\s*:\s*(\d+)', log_text)
 m_norm_drop = re.search(r'Log thuong bi drop \(Normal Drop\)\s*:\s*(\d+)', log_text)
 m_alm_gen = re.search(r'Log canh bao sinh \(Alarm Gen\)\s*:\s*(\d+)', log_text)
 m_alm_wr = re.search(r'Log canh bao da ghi \(Alarm Written\)\s*:\s*(\d+)', log_text)
 m_alm_drop = re.search(r'Log canh bao bi drop \(Alarm Drop\)\s*:\s*(\d+)', log_text)
 
-gen_cnt = int(m_gen.group(1)) if m_gen else 357
-proc_cnt = int(m_proc.group(1)) if m_proc else 249
-overrun_cnt = int(m_overrun.group(1)) if m_overrun else 108
-norm_gen_cnt = int(m_norm_gen.group(1)) if m_norm_gen else 217
-norm_wr_cnt = int(m_norm_wr.group(1)) if m_norm_wr else 18
-norm_drop_cnt = int(m_norm_drop.group(1)) if m_norm_drop else 199
-alm_gen_cnt = int(m_alm_gen.group(1)) if m_alm_gen else 3
-alm_wr_cnt = int(m_alm_wr.group(1)) if m_alm_wr else 3
-alm_drop_cnt = int(m_alm_drop.group(1)) if m_alm_drop else 0
+if not (m_gen and m_proc and m_overrun and m_norm_gen and m_norm_wr and m_norm_drop and m_alm_gen and m_alm_wr and m_alm_drop):
+    raise ValueError("Missing scenario 3 benchmark totals in simulation log!")
+
+gen_cnt = int(m_gen.group(1))
+proc_cnt = int(m_proc.group(1))
+overrun_cnt = int(m_overrun.group(1))
+norm_gen_cnt = int(m_norm_gen.group(1))
+norm_wr_cnt = int(m_norm_wr.group(1))
+norm_drop_cnt = int(m_norm_drop.group(1))
+alm_gen_cnt = int(m_alm_gen.group(1))
+alm_wr_cnt = int(m_alm_wr.group(1))
+alm_drop_cnt = int(m_alm_drop.group(1))
 
 # ==============================================================================
 # FIGURE 1: GANTT CHART OF 4 TASKS + IDLE OVER TIME (GIẢN ĐỒ XUNG RTOS GANTT)
@@ -225,16 +234,12 @@ freqs = np.linspace(0, (N//2 - 1) * df, N//2)
 # Normal Spectrum (Fundamental 100 Hz ~ Bin 6, 93.75 Hz)
 spec_normal = np.zeros(N//2)
 spec_normal[6] = 256.0 * 1.0  # Normalized magnitude for 1.0g sine
-# Add small noise floor
-np.random.seed(42)
-spec_normal += np.random.uniform(0.5, 2.0, N//2)
 spec_normal[0] = 0.0
 
 # Anomaly Spectrum (Block #6: 100 Hz fundamental + 300 Hz harmonic 3.0g)
 spec_anomaly = np.zeros(N//2)
 spec_anomaly[6] = 256.0 * 1.0   # 100 Hz component
 spec_anomaly[19] = 256.0 * 3.51 # 296.88 Hz fault harmonic (Bin 19)
-spec_anomaly += np.random.uniform(1.0, 3.5, N//2)
 spec_anomaly[0] = 0.0
 
 # Hard threshold in frequency magnitude
@@ -273,7 +278,7 @@ ax2.set_title('(B) Phổ FFT trạng thái BẤT THƯỜNG HƯ HỎNG VÒNG BI (
 ax2.grid(True, linestyle='--', alpha=0.5)
 ax2.legend(loc='upper right', frameon=True)
 
-fig.text(0.5, 0.005, '* Ghi chú: Hình lý thuyết theo Bảng 3.1, chưa đo trên máy hiện sóng vật lý.', ha='center', fontsize=9, style='italic')
+fig.text(0.5, 0.005, '* Ghi chú: Hình lý thuyết vẽ theo giá trị thiết kế Bảng 3.1, chưa đo trên máy hiện sóng vật lý.', ha='center', fontsize=9, style='italic')
 plt.tight_layout()
 fig.savefig('results/figures/02_fft_spectrum_normal_vs_anomaly.png', dpi=300)
 plt.close(fig)
@@ -285,17 +290,14 @@ print("Saved results/figures/02_fft_spectrum_normal_vs_anomaly.png")
 print("Plotting Figure 3: Detection to Alarm Latency Timeline...")
 fig, (ax_macro, ax_micro) = plt.subplots(2, 1, figsize=(13, 8), gridspec_kw={'height_ratios': [1, 1.3]})
 
-# Prepare data from parsed alarm_events
-if alarm_events:
-    ev_ticks = [e['tick'] for e in alarm_events]
-    ev_us = [e['us'] for e in alarm_events]
-    ev_ms = [e['us'] / 1000.0 for e in alarm_events]
-    ev_cycles = [e['cycles'] for e in alarm_events]
-else:
-    ev_ticks = [384, 896, 2048, 2236]
-    ev_us = [0.0, 107.63, 381.20, 0.0]
-    ev_ms = [0.0, 0.10763, 0.38120, 0.0]
-    ev_cycles = [0, 2691, 9530, 0]
+# Prepare data from parsed alarm_events (Strict validation - no fallback constants)
+if not alarm_events:
+    raise ValueError("No alarm events found in simulation log for Figure 3!")
+
+ev_ticks = [e['tick'] for e in alarm_events]
+ev_us = [e['us'] for e in alarm_events]
+ev_ms = [e['us'] / 1000.0 for e in alarm_events]
+ev_cycles = [e['cycles'] for e in alarm_events]
 
 # (A) MACRO VIEW: Compared against 10.0 ms Hard Deadline
 ax_macro.plot(ev_ticks, ev_ms, 'o-', color='#e74c3c', linewidth=2.0, markersize=8, label='Độ trễ đo thực tế (ms)')
@@ -395,7 +397,7 @@ for at in autotexts:
 
 ax2.set_title(f'(B) Phân bổ Bộ nhớ FreeRTOS heap_5 trong SRAM\n(Tổng dung lượng cấu hình: 64 KB = {heap_total:,} Bytes)', fontsize=12, fontweight='bold')
 
-fig.text(0.5, 0.005, '* Ghi chú: Hình lý thuyết vẽ theo giá trị thiết kế Bảng 3.1, chưa đo trên máy hiện sóng vật lý.', ha='center', fontsize=9, style='italic')
+fig.text(0.5, 0.005, '* Ghi chú: Số liệu Stack HWM và Heap được trích xuất từ FreeRTOS runtime trên QEMU AN547; Ngân sách Stack theo Bảng 3.1 Chương III.', ha='center', fontsize=9, style='italic')
 plt.tight_layout()
 fig.savefig('results/figures/04_memory_and_stack_hwm.png', dpi=300)
 plt.close(fig)
@@ -451,7 +453,7 @@ for b in bars4:
     ax4.text(b.get_x() + b.get_width()/2, h + 3, f'{int(h)}', ha='center', va='bottom', fontweight='bold', fontsize=8.5)
 ax4.set_ylim(0, max(s3_vals) * 1.18)
 ax4.set_ylabel('Số lượng khối / bản ghi', fontsize=10, fontweight='bold')
-ax4.set_title(f'[KỊCH BẢN 3] Quá tải chuỗi khối & Drop-Oldest (4 ms/khối)\n(357=249+108 | 217=18+199 | Alarm Drop: 0 [PASS] [ok])', fontsize=10, fontweight='bold')
+ax4.set_title(f'[KỊCH BẢN 3] Quá tải chuỗi khối & Drop-Oldest (4 ms/khối)\n({gen_cnt}={proc_cnt}+{overrun_cnt} | {norm_gen_cnt}={norm_wr_cnt}+{norm_drop_cnt} | Alarm Drop: {alm_drop_cnt} [PASS] [ok])', fontsize=10, fontweight='bold')
 ax4.grid(True, linestyle='--', alpha=0.4, axis='y')
 
 fig.text(0.5, 0.005, '* Ghi chú: Dữ liệu thực nghiệm trích xuất trực tiếp từ kết quả mô phỏng QEMU (results/03_simulation_logs.txt).', ha='center', fontsize=8.5, style='italic')

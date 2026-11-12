@@ -76,8 +76,8 @@
         </div>
         <div class="kpi-card">
             <div class="kpi-lbl">Preemption Latency</div>
-            <div class="kpi-val" style="color:#ef4444;">120.16 µs <span style="font-size:13px; font-weight:normal;">(3,004 cyc)</span></div>
-            <div class="kpi-sub">vTaskAlarm (P5) cướp CPU giữa phép FFT của vTaskProcessing (P3)</div>
+            <div class="kpi-val" style="color:#ef4444;">347.76 µs <span style="font-size:13px; font-weight:normal;">(8,694 cyc)</span></div>
+            <div class="kpi-sub">vTaskAlarm (P5) cướp CPU giữa phép FFT của vTaskProcessing (P3) (Mid-FFT: 166.00 µs / 4,150 cyc)</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-lbl">Priority Inheritance</div>
@@ -87,7 +87,7 @@
         <div class="kpi-card">
             <div class="kpi-lbl">Đẳng thức khối & Log (S3)</div>
             <div class="kpi-val" style="color:#38bdf8;">0 Alarm Drop</div>
-            <div class="kpi-sub">Khối: 240 = 174 + 66 | Log: 134 = 10 + 124 drops | Alarm: 0 drop</div>
+            <div class="kpi-sub">Khối: 357 = 249 + 108 | Log: 217 = 19 + 198 drops | Alarm: 0 drop (3/3 xả an toàn)</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-lbl">Bộ nhớ DTCM Tốc độ cao</div>
@@ -140,8 +140,8 @@
                     <td>2.0 ms</td>
                     <td><span class="badge badge-dtcm">DTCM</span></td>
                     <td>1,024 B (256w)</td>
-                    <td>196 Bytes (19.1%)</td>
-                    <td>828 Bytes</td>
+                    <td>184 Bytes (18.0%)</td>
+                    <td>840 Bytes</td>
                     <td><span class="badge badge-pass">AN TOÀN</span></td>
                 </tr>
                 <tr>
@@ -151,8 +151,8 @@
                     <td>12.0 ms</td>
                     <td><span class="badge badge-dtcm">DTCM</span></td>
                     <td>4,096 B (1024w)</td>
-                    <td>528 Bytes (12.9%)</td>
-                    <td>3,568 Bytes</td>
+                    <td>520 Bytes (12.7%)</td>
+                    <td>3,576 Bytes</td>
                     <td><span class="badge badge-pass">AN TOÀN</span></td>
                 </tr>
                 <tr>
@@ -179,6 +179,9 @@
                 </tr>
             </tbody>
         </table>
+        <p style="margin-top: 10px; font-size: 11px; color: var(--text-muted);">
+            * <strong>Ngân sách stack lý thuyết (Paper Budget) của vTaskProcessing:</strong> ~616 Bytes (Context 212 B + Locals 120 B + FFT Call 96 B + Unpack 64 B + API 80 B + Margin 44 B) so với cấp phát 4,096 B &rarr; Hệ số an toàn 7.7&times; (Thực tế HWM sử dụng: 520 Bytes / 12.7%).
+        </p>
     </div>
 
     <!-- Academic Figures Grid -->

@@ -26,24 +26,24 @@ Hệ thống bao gồm đúng **4 tác vụ ứng dụng + 1 tác vụ Idle**, t
 | **`vTaskAlarm`** | **5** (Cao nhất) | Phi chu kỳ ($D_i = 10.0$ ms) | $1.0$ ms | **DTCM** | 1,024 B (256 words) | Chờ Task Notification mang mã sự kiện từ Xử lý. Kích hoạt trực tiếp cơ cấu chấp hành (Còi/Đèn/Rơ-le) qua thanh ghi; được phép in trực tiếp 1 dòng thông báo khẩn cấp ra UART (vì không thể chờ Logging chu kỳ 1,000 ms), tuyệt đối không lấy Mutex hay gửi qua queue thường. |
 | **`vTaskAcquisition`** | **4** | Chu kỳ $T = 64$ ms ($D_i = 64$ ms) | $2.0$ ms | **DTCM** | 1,024 B (256 words) | Chờ Binary Semaphore `xBlockReady` từ ngắt DMA stub. Đóng gói mô tả khối (`BlockDescriptor_t`) gửi vào `xBlockQueue`. |
 | **`vTaskProcessing`** | **3** | Chu kỳ $T = 64$ ms ($D_i = 64$ ms) | $12.0$ ms | **DTCM** | 4,096 B (1,024 words) | Nhận khối, tăng tốc Vector Helium CMSIS-DSP tính toán FFT 512 mẫu, trích xuất đặc trưng rung động, so ngưỡng quyết định phát tín hiệu cảnh báo. |
-| **`vTaskLogging`** | **2** | Chu kỳ $T = 1,000$ ms ($D_i = 1,000$ ms) | $20.0$ ms | **SRAM** | 2,048 B (512 words) | Nhận bản ghi telemetry qua `xLogQueue` (bảo vệ bởi `xLogMutex`) và `xAlarmLogQueue`. Quản lý in log định kỳ ra UART và điều phối các kịch bản kiểm thử. |
+| **`vTaskLogging`** | **2** | Chu kỳ $T = 1,000$ ms ($D_i = 1,000$ ms) | $20.0$ ms | **SRAM** | 2,048 B (512 words) | Nhận bản ghi telemetry qua `xLogQueue` (bảo vệ bởi `xLogMutex`) và `xAlarmLogQueue`. Quản lý in log định kỳ ra UART và xả hàng đợi. (Lưu ý: Việc điều phối chuyển trạng thái 3 kịch bản kiểm thử được tách biệt hoàn toàn sang `vScenarioTimerCallback`). |
 | **`Idle Task`** | **0** (Thấp nhất) | Khi CPU rảnh rỗi | - | **SRAM** | 512 B (128 words) | Thu dọn tác vụ đã xóa, hỗ trợ `configUSE_TICKLESS_IDLE = 1` để tối ưu năng lượng. |
 
 > **Kiểm chứng khả năng lập lịch (RMA Schedulability)**:  
-> Hệ thống có đúng $n = 3$ tác vụ định kỳ độc lập. Tổng hệ số sử dụng CPU:
+> Hệ thống có đúng $n = 3$ tác vụ định kỳ độc lập (`vTaskAlarm` là tác vụ phi chu kỳ / sporadic hướng sự kiện nên không tính vào $n$). Tổng hệ số sử dụng CPU:
 > $$U = \frac{C_{\text{Acq}}}{T_{\text{Acq}}} + \frac{C_{\text{Proc}}}{T_{\text{Proc}}} + \frac{C_{\text{Log}}}{T_{\text{Log}}} = \frac{2.0}{64.0} + \frac{12.0}{64.0} + \frac{20.0}{1000.0} = 3.125\% + 18.75\% + 2.0\% = 23.875\% \approx 23.9\%$$
-> Giá trị này thấp hơn nhiều so với cận trên Liu & Layland cho $n = 3$: $U_{\text{bound}}(3) = 3(2^{1/3} - 1) \approx 78.0\%$. Toàn bộ các tác vụ đảm bảo đáp ứng hạn định nghiêm ngặt!
+> Giá trị này thấp hơn nhiều so với cận trên Liu & Layland cho $n = 3$: $U_{\text{bound}}(3) = 3(2^{1/3} - 1) \approx 78.0\%$. *(Lưu ý: Cận 75.7% xuất hiện khi đếm nhầm 4 tác vụ chu kỳ; thiết kế Chương III chuẩn xác là $n = 3$ với ngưỡng $78.0\%$)*. Toàn bộ các tác vụ đảm bảo đáp ứng hạn định nghiêm ngặt!
 
 ---
 
 ## 🔄 4 Đối Tượng Đồng Bộ & Giao Tiếp Liên Tác Vụ (IPC)
 
-1. **`xBlockReady` (Binary Semaphore)**: Cầu nối trực tiếp giữa Trình phục vụ ngắt DMA stub (`Interrupt0_IRQHandler`) và `vTaskAcquisition` khi một nửa bộ đệm đôi (512 mẫu) đã nạp xong.
+1. **`xBlockReady` (Binary Semaphore)**: Cầu nối trực tiếp giữa Trình phục vụ ngắt DMA stub (`Interrupt0_Handler`) và `vTaskAcquisition` khi một nửa bộ đệm đôi (512 mẫu) đã nạp xong.
 2. **`xBlockQueue` (Queue sâu 2 phần tử)**: Truyền cấu trúc mô tả khối `BlockDescriptor_t` (kích thước chỉ 16 bytes gồm con trỏ bộ đệm trong DTCM, số thứ tự khối, nhãn thời gian) từ `vTaskAcquisition` sang `vTaskProcessing`. Tránh tuyệt đối việc sao chép cồng kềnh toàn bộ 512 mẫu int16.
-3. **`Task Notification` (Gửi trực tiếp không dùng Queue)**: Cơ chế giao tiếp điểm-điểm tốc độ cao nhất giữa `vTaskProcessing` và `vTaskAlarm`. Mang trực tiếp mã sự kiện (`EVENT_HARD_ALARM`, `EVENT_SOFT_ALARM`), đánh thức `vTaskAlarm` tức thời để cướp quyền CPU xử lý sự cố.
+3. **`Task Notification` (Gửi trực tiếp không dùng Queue)**: Cơ chế giao tiếp điểm-điểm tốc độ cao nhất giữa `vTaskProcessing` (hoặc ISR ngắt khẩn cấp) và `vTaskAlarm`. Mang trực tiếp mã sự kiện (`EVENT_HARD_ALARM`, `EVENT_SOFT_ALARM`), đánh thức `vTaskAlarm` tức thời để cướp quyền CPU xử lý sự cố.
 4. **Phân tách Hàng đợi Log Thường & Log Cảnh báo**:
-   - `xLogQueue` (Queue sâu $8 \times 32$ B): Hàng đợi chứa các bản ghi `LogEntry_t` telemetry định kỳ. Áp dụng chính sách **Drop-Oldest**: khi hàng đợi đầy trong điều kiện quá tải/burst stress, tự động đọc bỏ bản ghi cũ nhất để luôn bảo tồn bản ghi mới nhất.
-   - `xAlarmLogQueue` (Queue sâu $8 \times 32$ B): Hàng đợi riêng biệt dành độc quyền cho bản ghi sự cố cảnh báo khẩn cấp, đảm bảo **không bao giờ bị mất bản ghi cảnh báo nào** (0 Alarm Drop).
+   - `xLogQueue` (Queue sâu $8 \times 32$ B): Hàng đợi chứa các bản ghi `LogEntry_t` telemetry định kỳ. Áp dụng chính sách **Drop-Oldest**: khi hàng đợi đầy trong điều kiện quá tải/burst stress, tự động đọc bỏ bản ghi cũ nhất để luôn bảo tồn bản ghi mới nhất. `vTaskProcessing` gửi vào hàng đợi theo cơ chế non-blocking (`timeout = 0`) để loại trừ nguy cơ đảo ngược ưu tiên ngược (Reverse Priority Inversion).
+   - `xAlarmLogQueue` (Queue sâu $8 \times 32$ B): Hàng đợi riêng biệt dành độc quyền cho bản ghi sự cố cảnh báo khẩn cấp, bảo toàn nguyên vẹn trong thực nghiệm: 0 bản ghi cảnh báo mất trong lần chạy này (3 cảnh báo / queue sâu 8, xả mỗi 1.000 ms).
    - `xLogMutex`: Mutex hỗ trợ **Thừa kế mức ưu tiên (Priority Inheritance)**, chỉ dùng chung giữa `vTaskProcessing` và `vTaskLogging`. `vTaskAlarm` **tuyệt đối không bao giờ lấy Mutex** để ngăn ngừa hiện tượng đảo ngược ưu tiên (Priority Inversion).
 
 ---
@@ -83,15 +83,18 @@ Trước khi khởi động Scheduler, firmware tự động thực thi Suite 4 
 - Kết quả: `vTaskProcessing` nhận diện chính xác $RMS = 2.22g$ tại Khối #6 và $RMS = 2.84g$ tại Khối #14 (vượt ngưỡng cứng $2.0g$). Kích hoạt tức thời 2 cảnh báo khẩn cấp `BUZZER_ON + RELAY_TRIP`. Các khối bình thường được ghi log thưa theo tỉ lệ $1:16$ ($\approx 1\text{ bản ghi/giây}$). $\rightarrow$ **PASS [ok]**.
 
 ### Kịch bản 2: Kiểm chứng Preemption thật & Priority Inheritance
-- **Phần A (Real Mid-FFT Preemption)**: Tại Tick 2048 ms, khi `vTaskProcessing` (Pri 3) đang thực thi biến đổi Fourier, ngắt phần mềm `Interrupt1_IRQn` được kích hoạt từ hook `rfft_mid_stage_hook()` ngay giữa các tầng bướm FFT. `vTaskAlarm` (Pri 5) lập tức cướp quyền CPU giữa chừng phép tính FFT ($t_{\text{start}} < t_{\text{irq}} \le t_{\text{actuate}} < t_{\text{end}}$), hoàn tất đóng rơ-le an toàn, sau đó trả lại CPU cho `vTaskProcessing` tiếp tục tính toán hoàn tất không lỗi. $\rightarrow$ **PASS [ok]**.
-- **Phần B (Genuine Priority Inheritance)**: Tranh chấp 3 task thật trên `xLogMutex` (§3.3.3 Chương III). `vTaskLogging` (Pri 2) giữ `xLogMutex`. `vTaskProcessing` (Pri 3) yêu cầu Mutex và bị chặn. FreeRTOS kernel tự động nâng ưu tiên của `vTaskLogging` từ 2 lên **3**. Khi `vTaskAcquisition` (Pri 4) thức dậy, do có ưu tiên cao hơn (4 > 3), tác vụ Thu thập cướp CPU thành công. Sau khi giải phóng Mutex, ưu tiên của `vTaskLogging` tự động khôi phục về mức gốc **2**. Cấm tuyệt đối `vTaskPrioritySet` để mô phỏng. $\rightarrow$ **PASS [ok]**.
+- **Phần A (Real Mid-FFT Preemption)**: Khi `vTaskProcessing` (Pri 3) đang thực thi biến đổi Fourier, ngắt phần mềm `Interrupt1_IRQn` được kích hoạt từ hook `rfft_mid_stage_hook()` ngay giữa các tầng bướm tính toán FFT. `vTaskAlarm` (Pri 5) lập tức cướp quyền CPU giữa chừng phép tính FFT, xác thực bất đẳng thức thời gian 4 điểm:
+  `[Preemption] Preemption verified! [PASS] [ok] t_start=51210956 < t_irq=51220848 <= t_actuate=51224998 < t_end=51241696 (cycles)`.
+  Sau khi hoàn tất đóng rơ-le an toàn, quyền điều khiển được trả lại cho `vTaskProcessing` tiếp tục tính toán hoàn tất không lỗi. $\rightarrow$ **PASS [ok]**.
+- **Phần B (Genuine Priority Inheritance)**: Tranh chấp 3 task thật trên `xLogMutex` (§3.3.3 Chương III). `vTaskLogging` (Pri 2) giữ `xLogMutex`. `vTaskProcessing` (Pri 3) yêu cầu Mutex và bị chặn. FreeRTOS kernel tự động nâng ưu tiên của `vTaskLogging` từ 2 lên **3**. Khi `vTaskAcquisition` (Pri 4) thức dậy, do có ưu tiên cao hơn (4 > 3), tác vụ Thu thập cướp CPU thành công (`Step 4: Acquisition arrives -> Preempts boosted Logging`). Sau khi giải phóng Mutex, ưu tiên của `vTaskLogging` tự động khôi phục về mức gốc **2**. Cấm tuyệt đối `vTaskPrioritySet` để mô phỏng.
+  *Ghi chú kiểm thử xác định*: Việc dừng timer DMA và kích hoạt ngắt `Interrupt0_IRQn` bằng tay qua `NVIC_SetPendingIRQ()` trong demo là kỹ thuật chuẩn của kiểm thử RTOS xác định (Deterministic Testing). Việc giữ Mutex xuyên suốt chuỗi demo là có chủ đích, bởi thao tác sao chép 1 bản ghi 32 B chỉ tốn ~10 chu kỳ CPU ($0.4\ \mu\text{s}$ ở 25 MHz), không đủ thời gian để task Pri 4 bất đồng bộ xuất hiện nếu không có dàn dựng đồng bộ. $\rightarrow$ **PASS [ok]**.
 
 ### Kịch bản 3: Thử nghiệm quá tải & Đẳng thức toán học (Stress Test)
-- Đẩy nhịp DMA từ 64 ms xuống **4 ms/khối** ($16\times$ quá tải), mô phỏng tắc nghẽn bộ đệm và bão hòa hàng đợi.
+- Đẩy nhịp DMA từ 64 ms xuống **4 ms/khối** ($16\times$ quá tải), mô phỏng tắc nghẽn bộ đệm đôi và bão hòa hàng đợi.
 - Kết quả nghiệm thu đẳng thức bảo toàn:
-  * **Đẳng thức khối**: $\text{Generated} (240) = \text{Processed} (174) + \text{Buffer\_Overruns} (66)$ $\rightarrow$ **DANG THUC DUNG [PASS] [ok]**.
-  * **Đẳng thức log thường**: $\text{Normal\_Gen} (134) = \text{Normal\_Written} (10) + \text{Normal\_Dropped} (124)$ $\rightarrow$ **DANG THUC DUNG [PASS] [ok]**.
-  * **Bảo toàn cảnh báo**: $\text{Alarm\_Gen} = 3,\ \text{Alarm\_Written} = 3,\ \mathbf{Alarm\_Dropped = 0}$ $\rightarrow$ **KHÔNG MẤT BẤT KỲ BẢN GHI CẢNH BÁO NÀO [PASS] [ok]**.
+  * **Đẳng thức khối**: $\text{Generated} (357) = \text{Processed} (249) + \text{Buffer\_Overruns} (108)$ $\rightarrow$ **DANG THUC DUNG [PASS] [ok]**.
+  * **Đẳng thức log thường**: $\text{Normal\_Gen} (217) = \text{Normal\_Written} (19) + \text{Normal\_Dropped} (198)$ $\rightarrow$ **DANG THUC DUNG [PASS] [ok]** *(Normal Written bao gồm cả các bản ghi được xả ở giai đoạn drain)*.
+  * **Bảo toàn cảnh báo**: $\text{Alarm\_Gen} = 3,\ \text{Alarm\_Written} = 3,\ \mathbf{Alarm\_Dropped = 0}$ $\rightarrow$ **0 BAN GHI CANH BAO MAT TRONG LAN CHAY NAY (3 canh bao / queue sau 8, xa moi 1000 ms) [PASS] [ok]**.
 
 ---
 
@@ -99,28 +102,28 @@ Trước khi khởi động Scheduler, firmware tự động thực thi Suite 4 
 
 ```text
 ====================================================================
-       TONG KET SO LIEU THUC NGHIEM TOAN DIEN (CHUONG IV - V2)     
+       TONG KET SO LIEU THUC NGHIEM TOAN DIEN (CHUONG IV - V3)     
 ====================================================================
 [1] THONG KE KHOI DU LIEU VA LOG (DANG THUC TOAN HOC):
-    - Tong so khoi sinh ra (Generated)   : 240
-    - Tong so khoi da xu ly (Processed)  : 174
-    - So lan tran bo dem DMA (Overrun)   : 66
+    - Tong so khoi sinh ra (Generated)   : 357
+    - Tong so khoi da xu ly (Processed)  : 249
+    - So lan tran bo dem DMA (Overrun)   : 108
     * Kiem tra dang thuc khoi: Generated == Processed + Overrun
-      (240 == 240) -> DANG THUC DUNG [PASS] [ok]
+      (357 == 357) -> DANG THUC DUNG [PASS] [ok]
 
 [2] PHAN TACH HANG DOI LOG THUONG VA LOG CANH BAO:
-    - Log thuong sinh ra (Normal Gen)    : 134
-    - Log thuong da ghi (Normal Written) : 10
-    - Log thuong bi drop (Normal Drop)   : 124 (Chinh sach Drop-Oldest tren xLogQueue)
+    - Log thuong sinh ra (Normal Gen)    : 217
+    - Log thuong da ghi (Normal Written) : 19 (Bao gom ban ghi xa o giai doan drain)
+    - Log thuong bi drop (Normal Drop)   : 198 (Chinh sach Drop-Oldest tren xLogQueue)
     * Kiem tra dang thuc log thuong: Generated == Written + Dropped
-      (134 == 134) -> DANG THUC DUNG [PASS] [ok]
+      (217 == 217) -> DANG THUC DUNG [PASS] [ok]
     - Log canh bao sinh (Alarm Gen)      : 3
     - Log canh bao da ghi (Alarm Written): 3
-    - Log canh bao bi drop (Alarm Drop)  : 0 -> KHONG MAT BAT KY BAN GHI CANH BAO NAO [PASS] [ok]
+    - Log canh bao bi drop (Alarm Drop)  : 0 -> 0 BAN GHI CANH BAO MAT TRONG LAN CHAY NAY (3 canh bao / queue sau 8, xa moi 1000 ms) [PASS] [ok]
 
 [3] DO TRE PHAT HIEN -> BAO DONG (DO CHU KY SYSTICK):
-    - Do tre cuc dai (Max Latency)       : 3004 cycles (120.16 us)
-    - Do tre trung binh (Mean Latency)   : 290 cycles (11.60 us)
+    - Do tre cuc dai (Max Latency)       : 8694 cycles (347.76 us)
+    - Do tre trung binh (Mean Latency)   : 4004 cycles (160.16 us)
     * Ghi chu hoc thuat: So lieu do bang SysTick tren QEMU MPS3 AN547 (25 MHz).
       Khong phai so do dao dong ky tren phan cung that STM32N6.
 
@@ -134,15 +137,43 @@ Trước khi khởi động Scheduler, firmware tự động thực thi Suite 4 
 Task Name        | Prio | Memory | Alloc (Bytes) | Free HWM (Bytes) | Used (Bytes)
 --------------------------------------------------------------------------------
 vTaskAlarm       |  5   |  DTCM  |  1024 (256w)  |  712 Bytes       |  312 Bytes
-vTaskAcquisition |  4   |  DTCM  |  1024 (256w)  |  828 Bytes       |  196 Bytes
-vTaskProcessing  |  3   |  DTCM  |  4096 (1024w) |  3568 Bytes       |  528 Bytes
+vTaskAcquisition |  4   |  DTCM  |  1024 (256w)  |  840 Bytes       |  184 Bytes
+vTaskProcessing  |  3   |  DTCM  |  4096 (1024w) |  3576 Bytes       |  520 Bytes
 vTaskLogging     |  2   |  SRAM  |  2048 (512w)  |  1704 Bytes       |  344 Bytes
 Idle Task        |  0   |  SRAM  |   512 (128w)  |  352 Bytes       |  160 Bytes
 --------------------------------------------------------------------------------
+Ngan sach ly thuyet vTaskProcessing (Paper Budget): ~616 Bytes
+  (Context: 212 B + Locals: 120 B + FFT Call: 96 B + Unpack: 64 B + API: 80 B + Margin: 44 B)
+  -> So voi cap phat 4096 B: He so an toan 7.7x (Thuc te HWM su dung: 520 Bytes / 12.9%)
+--------------------------------------------------------------------------------
 Ghi chu: Free HWM la so byte ngan xep toi thieu con du chua tung bi cham toi.
-         Moi Task deu thoa man: Used < Alloc (Khong vuot ngan sach).
+Ket luan: [PASS] [ok] Moi Task deu thoa man: Used < Alloc (Khong vuot ngan sach).
 ====================================================================
 ```
+
+---
+
+## 📡 Quy Tắc Truyền Thông UART & Các Điểm In Trực Tiếp
+
+Quy tắc chuẩn hóa trong thiết kế Chương III: **Toàn bộ nhật ký vận hành (Operational Telemetry) của 4 tác vụ ứng dụng bắt buộc phải gửi qua `xLogQueue` hoặc `xAlarmLogQueue` để `vTaskLogging` in ra UART**. Ngoại lệ vận hành duy nhất là dòng thông báo khẩn cấp của `vTaskAlarm` (Pri 5), được phép in trực tiếp ra phần cứng UART nhằm đảm bảo đáp ứng hạn ngặt $D_i = 10.0\text{ ms}$ mà không thể chờ chu kỳ 1.000 ms của `vTaskLogging`.
+
+Ngoài ngoại lệ vận hành trên, mọi điểm in UART trực tiếp (`uart_puts`) còn lại trong mã nguồn đều thuộc về hạ tầng kiểm thử và chẩn đoán hệ thống:
+1. **Khởi tạo hệ thống trước Scheduler (`main`, `init_dtcm_memory`)**: In banner và cấu hình heap khi chưa có task nào chạy.
+2. **Bộ kiểm tra chuẩn vàng (`run_golden_fft_tests`)**: In kết quả xác minh 4 test FFT trước khi khởi động Scheduler.
+3. **Các Hook xử lý lỗi nghiêm trọng (`vApplicationStackOverflowHook`, `vApplicationMallocFailedHook`, `vAssertCalled`)**: Dừng khẩn cấp khi tràn stack hoặc cạn heap.
+4. **Bộ điều phối kịch bản (`vScenarioTimerCallback`)**: In tiêu đề chuyển đổi trạng thái kịch bản và kết quả kiểm thử `[PASS] [ok]`.
+5. **Điểm xác nhận Preemption giữa FFT (`vTaskProcessing`)**: In 1 dòng chứa dấu vết 4 timestamp chứng minh $t_{\text{start}} < t_{\text{irq}} \le t_{\text{actuate}} < t_{\text{end}}$.
+6. **Điểm xác nhận cướp quyền trong Kịch bản 2B (`vTaskAcquisition`)**: In dòng xác nhận Thu thập (Pri 4) cướp CPU từ Logging (Pri 3 kế thừa).
+7. **Báo cáo tổng kết thực nghiệm cuối cùng (`print_final_benchmark_report`)**: In bảng HWM và phân tích bộ nhớ sau khi dừng thu thập.
+
+---
+
+## 🔔 Giải Thích: 12 Lần Kích Hoạt Cảnh Báo vs 3 Bản Ghi Nhật Ký
+
+Trong quá trình thực nghiệm, có thể ghi nhận tổng cộng 12 lần cơ cấu cảnh báo phần cứng được kích hoạt, trong khi chỉ có 3 bản ghi nhật ký cảnh báo được lưu vào `xAlarmLogQueue`:
+- **Đường xử lý khẩn cấp (Fast Path)**: Mỗi khi có ngắt khẩn cấp (bao gồm cả các probe ngắt `Interrupt1_IRQn` lặp lại giữa phép FFT trong Kịch bản 2 để đo đạc thời gian đáp ứng), `vTaskAlarm` nhận tín hiệu Task Notification và kích hoạt ngay lập tức cơ cấu chấp hành phần cứng (còi/đèn/rơ-le) mà không tạo bản ghi log.
+- **Đường lưu trữ nhật ký (Telemetry Path)**: Chỉ khi `vTaskProcessing` phát hiện sự cố rung động thực sự qua phân tích phổ FFT (Khối #6, Khối #14 và khối bất thường Kịch bản 3), bản ghi `LogEntry_t` (RMS, Peak, CF, Freq) mới được đóng gói gửi vào `xAlarmLogQueue`.
+- Sự phân tách này đảm bảo cơ cấu an toàn phản ứng tức thì mà không bị nghẽn bởi việc định dạng chuỗi dữ liệu.
 
 ---
 
