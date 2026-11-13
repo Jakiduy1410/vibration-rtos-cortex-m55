@@ -175,22 +175,22 @@ for tick_s, task, lat_c_s, ex_c_s in raw_metrics:
 # FIGURE 1: GANTT CHART OF 4 TASKS + IDLE OVER TIME (THEORETICAL DESIGN GANTT)
 # ==============================================================================
 print("Plotting Figure 1: Task Execution Gantt Chart (Theoretical)...")
-fig1, (ax1_1, ax1_2) = plt.subplots(2, 1, figsize=(12, 7), gridspec_kw={'height_ratios': [2.2, 1.3]})
+fig1, (ax1_1, ax1_2) = plt.subplots(2, 1, figsize=(14, 9.5), gridspec_kw={'height_ratios': [1.8, 1.4]})
 
 task_names_gantt = ['Idle Task (P0)', 'vTaskLogging (P2)', 'vTaskProcessing (P3)', 'vTaskAcquisition (P4)', 'vTaskAlarm (P5)']
 
-ax1_1.set_ylim(-0.6, 4.8)
+ax1_1.set_ylim(-0.6, 5.3)
 ax1_1.set_yticks([0, 1, 2, 3, 4])
 ax1_1.set_yticklabels(task_names_gantt, fontweight='bold', fontsize=10)
 ax1_1.set_xlim(-50, 3100)
 ax1_1.set_xlabel('Thời gian mô phỏng FreeRTOS (ms)', fontsize=11, fontweight='bold')
-ax1_1.set_title('(A) Giản đồ xung định thời thực thi 4 Task + Idle (Lý thuyết Bảng 3.1 Chương III)', fontsize=13, fontweight='bold', pad=12)
+ax1_1.set_title('(A) Giản đồ xung định thời thực thi 4 Task + Idle (Lý thuyết Bảng 3.1 Chương III)', fontsize=13, fontweight='bold', pad=32)
 apply_axes_style(ax1_1, grid_axis='x')
 
 # Background regions for 3 scenarios
-ax1_1.axvspan(-50, 2030, color='#e8f4f8', alpha=0.5, label='Kịch bản 1: Giám sát rung động & Báo động (0 - 2000 ms)')
-ax1_1.axvspan(2030, 2140, color='#fef9e7', alpha=0.6, label='Kịch bản 2: Cướp quyền & Thừa kế ưu tiên (2030 - 2140 ms)')
-ax1_1.axvspan(2140, 3100, color='#fdedec', alpha=0.5, label='Kịch bản 3: Quá tải chuỗi khối & Drop-Oldest (2140 - 3100 ms)')
+ax1_1.axvspan(-50, 2030, color='#e8f4f8', alpha=0.5, label='Kịch bản 1: Giám sát & Báo động (0 - 2000 ms)')
+ax1_1.axvspan(2030, 2140, color='#fef9e7', alpha=0.6, label='Kịch bản 2: Cướp quyền & Thừa kế (2030 - 2140 ms)')
+ax1_1.axvspan(2140, 3100, color='#fdedec', alpha=0.5, label='Kịch bản 3: Quá tải & Drop-Oldest (2140 - 3100 ms)')
 
 # Plot Scenario 1 Tasks (0 - 2000 ms)
 for k in range(32):
@@ -202,12 +202,14 @@ for k in range(32):
 
 # Alarms at Block #6 and #14
 ax1_1.broken_barh([(384 + 14.5, 2.5)], (3.6, 0.75), facecolors=TASK_COLORS['Alarm'], edgecolor='black', lw=0.5)
-ax1_1.annotate('Báo động #1 (Block #6)\nRMS=2.24g | F=296.9Hz', xy=(398, 4.35), xytext=(398, 4.6),
-             arrowprops=dict(facecolor=TASK_COLORS['Alarm'], arrowstyle='->', lw=1.2), fontsize=8, ha='center', color=TASK_COLORS['Alarm'], fontweight='bold')
+ax1_1.annotate('Báo động #1 (Block #6)\nRMS=2.24g | F=296.9Hz', xy=(398.5, 4.0), xytext=(398.5, 4.65),
+               arrowprops=dict(facecolor=TASK_COLORS['Alarm'], arrowstyle='->', lw=1.2), fontsize=8.5, ha='center', color=TASK_COLORS['Alarm'], fontweight='bold',
+               bbox=dict(boxstyle='round,pad=0.2', facecolor='#fdedec', edgecolor=TASK_COLORS['Alarm'], alpha=0.9))
 
 ax1_1.broken_barh([(896 + 14.5, 2.5)], (3.6, 0.75), facecolors=TASK_COLORS['Alarm'], edgecolor='black', lw=0.5)
-ax1_1.annotate('Báo động #2 (Block #14)\nRMS=2.83g | F=93.8Hz', xy=(910, 4.35), xytext=(910, 4.6),
-             arrowprops=dict(facecolor=TASK_COLORS['Alarm'], arrowstyle='->', lw=1.2), fontsize=8, ha='center', color=TASK_COLORS['Alarm'], fontweight='bold')
+ax1_1.annotate('Báo động #2 (Block #14)\nRMS=2.83g | F=93.8Hz', xy=(910.5, 4.0), xytext=(910.5, 4.65),
+               arrowprops=dict(facecolor=TASK_COLORS['Alarm'], arrowstyle='->', lw=1.2), fontsize=8.5, ha='center', color=TASK_COLORS['Alarm'], fontweight='bold',
+               bbox=dict(boxstyle='round,pad=0.2', facecolor='#fdedec', edgecolor=TASK_COLORS['Alarm'], alpha=0.9))
 
 # Logging Task (P2)
 ax1_1.broken_barh([(1001, 18)], (0.6, 0.75), facecolors=TASK_COLORS['Logging'], edgecolor='black', lw=0.5)
@@ -216,42 +218,46 @@ ax1_1.broken_barh([(2001, 18)], (0.6, 0.75), facecolors=TASK_COLORS['Logging'], 
 # Scenario 2 at 2048 ms
 ax1_1.broken_barh([(2048, 8)], (1.6, 0.75), facecolors=TASK_COLORS['Processing'], edgecolor='black', lw=0.5)
 ax1_1.broken_barh([(2048, 2.5)], (3.6, 0.75), facecolors=TASK_COLORS['Alarm'], edgecolor='black', lw=0.5)
-ax1_1.annotate('Preemption giữa FFT!\n(Pri 5 cướp Pri 3)', xy=(2048, 4.35), xytext=(2048, 4.6),
-             arrowprops=dict(facecolor=TASK_COLORS['Boosted'], arrowstyle='->', lw=1.2), fontsize=8, ha='center', color=TASK_COLORS['Boosted'], fontweight='bold')
+ax1_1.annotate('Preemption giữa FFT!\n(Pri 5 cướp Pri 3)', xy=(2048, 4.0), xytext=(2048, 4.65),
+               arrowprops=dict(facecolor=TASK_COLORS['Boosted'], arrowstyle='->', lw=1.2), fontsize=8.5, ha='center', color=TASK_COLORS['Boosted'], fontweight='bold',
+               bbox=dict(boxstyle='round,pad=0.2', facecolor='#f4ecf7', edgecolor=TASK_COLORS['Boosted'], alpha=0.9))
 
 # Priority Inheritance at ~2060 ms
 ax1_1.broken_barh([(2060, 40)], (0.6, 0.75), facecolors=TASK_COLORS['Boosted'], edgecolor='black', lw=0.5)
-ax1_1.annotate('Logging nâng ưu tiên (Pri 2 -> 3)\ndo giữ xLogMutex', xy=(2080, 1.4), xytext=(2080, 2.3),
-             arrowprops=dict(facecolor=TASK_COLORS['Boosted'], arrowstyle='->', lw=1.2), fontsize=8, ha='center', color=TASK_COLORS['Boosted'], fontweight='bold')
+ax1_1.annotate('Logging nâng ưu tiên (Pri 2 -> 3)\ndo giữ xLogMutex', xy=(2080, 0.62), xytext=(2080, -0.15),
+               arrowprops=dict(facecolor=TASK_COLORS['Boosted'], arrowstyle='->', lw=1.2), fontsize=8.5, ha='center', va='center', color=TASK_COLORS['Boosted'], fontweight='bold',
+               bbox=dict(boxstyle='round,pad=0.25', facecolor='#f4ecf7', edgecolor=TASK_COLORS['Boosted'], alpha=0.9))
 
 # Scenario 3: Burst mode (4 ms period)
 for t in range(2150, 3000, 14):
     ax1_1.broken_barh([(t, 2.0)], (2.6, 0.75), facecolors=TASK_COLORS['Acquisition'], edgecolor='none')
     ax1_1.broken_barh([(t + 2.0, 10.0)], (1.6, 0.75), facecolors=TASK_COLORS['Processing'], edgecolor='none')
 
-ax1_1.legend(loc='upper right', framealpha=0.95, edgecolor='#CCCCCC', fontsize=9)
+ax1_1.legend(loc='lower center', bbox_to_anchor=(0.5, 1.015), ncol=3, columnspacing=1.2, framealpha=0.95, edgecolor='#CCCCCC', fontsize=9.0)
 
 # Subplot 2: Zoom Scenario 2
-ax1_2.set_ylim(-0.6, 4.8)
+ax1_2.set_ylim(-0.6, 5.6)
 ax1_2.set_yticks([0, 1, 2, 3, 4])
-ax1_2.set_yticklabels(task_names_gantt, fontweight='bold', fontsize=9)
+ax1_2.set_yticklabels(task_names_gantt, fontweight='bold', fontsize=9.5)
 ax1_2.set_xlim(2045, 2085)
 ax1_2.set_xlabel('Thời gian mô phỏng FreeRTOS (ms) - Chi tiết Kịch bản 2', fontsize=11, fontweight='bold')
-ax1_2.set_title('(B) Chi tiết Vi mô Cướp quyền (Preemption) và Thừa kế Ưu tiên (Priority Inheritance 2->3->2)', fontsize=13, fontweight='bold', pad=8)
+ax1_2.set_title('(B) Chi tiết Vi mô Cướp quyền (Preemption) và Thừa kế Ưu tiên (Priority Inheritance 2->3->2)', fontsize=13, fontweight='bold', pad=26)
 apply_axes_style(ax1_2, grid_axis='x')
 
 ax1_2.broken_barh([(2046, 2)], (1.6, 0.75), facecolors=TASK_COLORS['Processing'], edgecolor='black', lw=0.6)
 ax1_2.broken_barh([(2050, 6)], (1.6, 0.75), facecolors=TASK_COLORS['Processing'], edgecolor='black', lw=0.6)
 ax1_2.broken_barh([(2048, 2)], (3.6, 0.75), facecolors=TASK_COLORS['Alarm'], edgecolor='black', lw=0.6)
-ax1_2.annotate('Alarm cướp CPU ngay giữa phép FFT\n(Pri 5 > 3, độ trễ = 0 tick)', xy=(2049, 4.35), xytext=(2047, 4.5),
-             arrowprops=dict(facecolor=TASK_COLORS['Alarm'], arrowstyle='->', lw=1.2), fontsize=8, ha='center', color=TASK_COLORS['Alarm'], fontweight='bold')
+ax1_2.annotate('Alarm cướp CPU ngay giữa phép FFT\n(Pri 5 > 3, độ trễ = 0 tick)', xy=(2049, 4.35), xytext=(2049, 4.85),
+               arrowprops=dict(facecolor=TASK_COLORS['Alarm'], arrowstyle='->', lw=1.2), fontsize=8.5, ha='center', color=TASK_COLORS['Alarm'], fontweight='bold',
+               bbox=dict(boxstyle='round,pad=0.25', facecolor='#fdedec', edgecolor=TASK_COLORS['Alarm'], alpha=0.9))
 
 ax1_2.broken_barh([(2060, 25)], (0.6, 0.75), facecolors=TASK_COLORS['Boosted'], edgecolor='black', lw=0.6)
-ax1_2.text(2072, 1.0, 'Logging boosted to Pri 3 (Inherited)', ha='center', va='center', fontsize=8, color='white', fontweight='bold')
+ax1_2.text(2072.5, 1.0, 'Logging boosted to Pri 3 (Inherited)', ha='center', va='center', fontsize=9, color='white', fontweight='bold')
 
 ax1_2.broken_barh([(2075, 2.5)], (2.6, 0.75), facecolors=TASK_COLORS['Acquisition'], edgecolor='black', lw=0.6)
-ax1_2.annotate('Acquisition (Pri 4) cướp CPU\ncủa Logging đã boosted (4 > 3)', xy=(2076, 3.35), xytext=(2076, 4.0),
-             arrowprops=dict(facecolor=TASK_COLORS['Acquisition'], arrowstyle='->', lw=1.2), fontsize=8, ha='center', color=TASK_COLORS['Acquisition'], fontweight='bold')
+ax1_2.annotate('Acquisition (Pri 4) cướp CPU\ncủa Logging đã boosted (4 > 3)', xy=(2076.25, 3.35), xytext=(2076.25, 4.15),
+               arrowprops=dict(facecolor=TASK_COLORS['Acquisition'], arrowstyle='->', lw=1.2), fontsize=8.5, ha='center', color=TASK_COLORS['Acquisition'], fontweight='bold',
+               bbox=dict(boxstyle='round,pad=0.25', facecolor='#ebf5fb', edgecolor=TASK_COLORS['Acquisition'], alpha=0.9))
 
 plt.tight_layout(rect=[0, 0.035, 1, 1])
 fig1.text(0.5, 0.012, '* Ghi chú: Hình lý thuyết vẽ theo giá trị thiết kế Bảng 3.1, chưa đo trên máy hiện sóng vật lý.', ha='center', fontsize=9, style='italic')
@@ -500,7 +506,7 @@ print("Saved results/figures/05_scenario_summary_dashboard.png")
 # FIGURE 6: REAL MEASURED GANTT CHART (FROM [TRACE] RAM BUFFER)
 # ==============================================================================
 print("Plotting Figure 6: Real Measured Task Execution Gantt Chart...")
-fig6, (ax6_1, ax6_2) = plt.subplots(2, 1, figsize=(12, 7), gridspec_kw={'height_ratios': [2.2, 1.3]})
+fig6, (ax6_1, ax6_2) = plt.subplots(2, 1, figsize=(14, 9.5), gridspec_kw={'height_ratios': [1.8, 1.4]})
 
 lane_map = {
     'Idle': 0,
@@ -515,8 +521,9 @@ raw_traces = re.findall(r'\[TRACE\]\s+tick=(\d+)\s+cycles=(\d+)\s+task=(\w+)\s+e
 if not raw_traces:
     raise ValueError("No [TRACE] events found in simulation log for Figure 6!")
 
-# Reconstruct intervals
-task_intervals = {k: [] for k in lane_map}
+# Reconstruct intervals with separate visual width rules for Panel A and Panel B
+task_intervals_A = {k: [] for k in lane_map}
+task_intervals_B = {k: [] for k in lane_map}
 current_in = {}
 for tick_s, cyc_s, task, event in raw_traces:
     if task not in lane_map:
@@ -528,24 +535,25 @@ for tick_s, cyc_s, task, event in raw_traces:
     elif event == 'OUT':
         if task in current_in:
             t_start = current_in.pop(task)
-            dur = max(t_ms - t_start, 2.5) # Minimum 2.5 ms width so microsecond execution slices are visually distinct
-            task_intervals[task].append((t_start, dur))
+            dur = t_ms - t_start
+            task_intervals_A[task].append((t_start, max(dur, 2.5)))
+            task_intervals_B[task].append((t_start, max(dur, 0.22)))
 
-ax6_1.set_ylim(-0.6, 4.8)
+ax6_1.set_ylim(-0.6, 5.3)
 ax6_1.set_yticks([0, 1, 2, 3, 4])
 ax6_1.set_yticklabels(task_names_gantt, fontweight='bold', fontsize=10)
 ax6_1.set_xlim(-50, 3150)
 ax6_1.set_xlabel('Thời gian mô phỏng FreeRTOS (ms)', fontsize=11, fontweight='bold')
-ax6_1.set_title('(A) Giản đồ xung định thời thực thi 4 Task + Idle (Đo đạc từ RAM Trace Buffer trên QEMU)', fontsize=12, fontweight='bold', pad=12)
+ax6_1.set_title('(A) Giản đồ xung định thời thực thi 4 Task + Idle (Đo đạc từ RAM Trace Buffer trên QEMU)', fontsize=13, fontweight='bold', pad=32)
 apply_axes_style(ax6_1, grid_axis='x')
 
 # Scenario backgrounds
-ax6_1.axvspan(-50, 2030, color='#e8f4f8', alpha=0.5, label='Kịch bản 1: Giám sát rung động & Báo động (0 - 2000 ms)')
-ax6_1.axvspan(2030, 2140, color='#fef9e7', alpha=0.6, label='Kịch bản 2: Cướp quyền & Thừa kế ưu tiên (2030 - 2140 ms)')
-ax6_1.axvspan(2140, 3150, color='#fdedec', alpha=0.5, label='Kịch bản 3: Quá tải chuỗi khối & Drop-Oldest (2140 - 3150 ms)')
+ax6_1.axvspan(-50, 2030, color='#e8f4f8', alpha=0.5, label='Kịch bản 1: Giám sát & Báo động (0 - 2000 ms)')
+ax6_1.axvspan(2030, 2140, color='#fef9e7', alpha=0.6, label='Kịch bản 2: Cướp quyền & Thừa kế (2030 - 2140 ms)')
+ax6_1.axvspan(2140, 3150, color='#fdedec', alpha=0.5, label='Kịch bản 3: Quá tải & Drop-Oldest (2140 - 3150 ms)')
 
 # Plot measured bars for each task (Idle in lighter gray)
-for task_key, segs in task_intervals.items():
+for task_key, segs in task_intervals_A.items():
     lane = lane_map[task_key]
     if task_key == 'Idle':
         color = '#D5D8DC'
@@ -555,25 +563,32 @@ for task_key, segs in task_intervals.items():
         alpha = 0.95
     ax6_1.broken_barh(segs, (lane - 0.38, 0.76), facecolors=color, edgecolor='none', alpha=alpha)
 
-# Annotations for alarms
-for ev in alarm_events:
-    t = ev['tick']
-    ax6_1.annotate(f"Cảnh báo\n{ev['us']:.1f}µs", xy=(t, 4.0), xytext=(t, 4.45),
-                   arrowprops=dict(facecolor=TASK_COLORS['Alarm'], arrowstyle='->', lw=1.0), fontsize=7.5, ha='center', color=TASK_COLORS['Alarm'], fontweight='bold')
+# Annotations for alarms with non-overlapping horizontal offsets
+alarm_offsets = [
+    (384, 384, 4.65, 'Cảnh báo #1\n0.0 µs'),
+    (896, 896, 4.65, 'Cảnh báo #2\n142.2 µs'),
+    (2048, 1960, 4.65, 'Cảnh báo #3 (S2)\n342.9 µs'),
+    (2236, 2320, 4.65, 'Cảnh báo #4 (S3)\n0.0 µs')
+]
+for t_act, t_text, y_text, lbl in alarm_offsets:
+    ax6_1.annotate(lbl, xy=(t_act, 4.0), xytext=(t_text, y_text),
+                   arrowprops=dict(facecolor=TASK_COLORS['Alarm'], arrowstyle='->', lw=1.0),
+                   fontsize=8, ha='center', color=TASK_COLORS['Alarm'], fontweight='bold',
+                   bbox=dict(boxstyle='round,pad=0.2', facecolor='#fdedec', edgecolor=TASK_COLORS['Alarm'], alpha=0.9))
 
-# Move legend inside panel A in a vacant spot or upper right to avoid overlapping title (A)
-ax6_1.legend(loc='upper right', framealpha=0.95, edgecolor='#CCCCCC', fontsize=9)
+# Move legend above the plot under title to eliminate any overlap with data and annotations
+ax6_1.legend(loc='lower center', bbox_to_anchor=(0.5, 1.015), ncol=3, columnspacing=1.2, framealpha=0.95, edgecolor='#CCCCCC', fontsize=9.0)
 
 # Subplot B: Zoom-in around Scenario 2 (narrowed to 2046 - 2054 ms)
 ax6_2.set_xlim(2046.0, 2054.0)
-ax6_2.set_ylim(-0.6, 4.8)
+ax6_2.set_ylim(-0.6, 5.8)
 ax6_2.set_yticks([0, 1, 2, 3, 4])
-ax6_2.set_yticklabels(task_names_gantt, fontweight='bold', fontsize=9)
+ax6_2.set_yticklabels(task_names_gantt, fontweight='bold', fontsize=9.5)
 ax6_2.set_xlabel('Thời gian chi tiết (Tick / ms) - Zoom-in Kịch bản 2 (2046 - 2054 ms)', fontsize=11, fontweight='bold')
-ax6_2.set_title('(B) Vi mô cơ chế cướp quyền (Preemption mid-FFT) & Thừa kế ưu tiên (Priority Inheritance 2->3->2)', fontsize=12, fontweight='bold', pad=8)
+ax6_2.set_title('(B) Vi mô cơ chế cướp quyền (Preemption mid-FFT) & Thừa kế ưu tiên (Priority Inheritance 2->3->2)', fontsize=13, fontweight='bold', pad=26)
 apply_axes_style(ax6_2, grid_axis='x')
 
-for task_key, segs in task_intervals.items():
+for task_key, segs in task_intervals_B.items():
     lane = lane_map[task_key]
     if task_key == 'Idle':
         color = '#D5D8DC'
@@ -595,13 +610,22 @@ if m_pre:
 
     ax6_2.annotate(f'Preemption giữa FFT: t_start ({t_start_c:,}) < t_irq ({t_irq_c:,}) <= t_actuate ({t_act_c:,}) < t_end ({t_end_c:,})\n'
                    f'Độ trễ kích hoạt = {t_act_c - t_irq_c} cycles ({(t_act_c - t_irq_c)/25.0:.2f} µs) [PASS] [ok]',
-                   xy=(t_act_ms, 4.0), xytext=(2047.5, 4.45),
-                   arrowprops=dict(facecolor=TASK_COLORS['Alarm'], arrowstyle='->', lw=1.2), fontsize=8, ha='left', color=TASK_COLORS['Alarm'], fontweight='bold',
-                   bbox=dict(boxstyle='round,pad=0.3', facecolor='#fdedec', edgecolor=TASK_COLORS['Alarm'], alpha=0.9))
+                   xy=(t_act_ms, 4.1), xytext=(2046.3, 4.85),
+                   arrowprops=dict(facecolor=TASK_COLORS['Alarm'], arrowstyle='->', lw=1.2),
+                   fontsize=8.5, ha='left', va='center', color=TASK_COLORS['Alarm'], fontweight='bold',
+                   bbox=dict(boxstyle='round,pad=0.35', facecolor='#fdedec', edgecolor=TASK_COLORS['Alarm'], alpha=0.95))
 
-ax6_2.annotate('Logging nâng ưu tiên (Pri 2 -> 3)\ndo giữ xLogMutex', xy=(2049.5, 1.0), xytext=(2050.2, 1.8),
-               arrowprops=dict(facecolor=TASK_COLORS['Boosted'], arrowstyle='->', lw=1.2), fontsize=8, ha='left', color=TASK_COLORS['Boosted'], fontweight='bold',
-               bbox=dict(boxstyle='round,pad=0.3', facecolor='#f4ecf7', edgecolor=TASK_COLORS['Boosted'], alpha=0.9))
+ax6_2.annotate('Logging nâng ưu tiên (Pri 2 -> 3)\ndo giữ xLogMutex',
+               xy=(2049.5, 0.62), xytext=(2046.3, -0.15),
+               arrowprops=dict(facecolor=TASK_COLORS['Boosted'], arrowstyle='->', lw=1.2),
+               fontsize=8.5, ha='left', va='center', color=TASK_COLORS['Boosted'], fontweight='bold',
+               bbox=dict(boxstyle='round,pad=0.3', facecolor='#f4ecf7', edgecolor=TASK_COLORS['Boosted'], alpha=0.95))
+
+ax6_2.annotate('Acquisition (Pri 4) cướp CPU\ncủa Logging đã boosted (4 > 3)',
+               xy=(2051.0, 3.38), xytext=(2051.6, 3.85),
+               arrowprops=dict(facecolor=TASK_COLORS['Acquisition'], arrowstyle='->', lw=1.2),
+               fontsize=8, ha='left', va='center', color=TASK_COLORS['Acquisition'], fontweight='bold',
+               bbox=dict(boxstyle='round,pad=0.25', facecolor='#ebf5fb', edgecolor=TASK_COLORS['Acquisition'], alpha=0.9))
 
 plt.tight_layout(rect=[0, 0.035, 1, 1])
 fig6.text(0.5, 0.012, '* Ghi chú học thuật: Giản đồ xung đo đạc thực tế từ RAM trace hook (traceTASK_SWITCHED_IN/OUT) trên QEMU MPS3 AN547 (25 MHz).', ha='center', fontsize=9, style='italic')
