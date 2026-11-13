@@ -43,88 +43,88 @@ Tong so thanh ghi duoc bao toan trong 1 lan Context Switch day du FPU/MVE:
 
 [3] DISASSEMBLY CHI TIET CUA PendSV_Handler:
 --------------------------------------------------------------------------------
-000053a8 <PendSV_Handler>:
+00006850 <PendSV_Handler>:
 
 #else /* configENABLE_MPU */
 
     void PendSV_Handler( void ) /* __attribute__ (( naked )) PRIVILEGED_FUNCTION */
     {
         __asm volatile
-    53a8:	f3ef 8009 	mrs	r0, PSP
-    53ac:	f01e 0f10 	tst.w	lr, #16
-    53b0:	bf08      	it	eq
-    53b2:	ed20 8a10 	vstmdbeq	r0!, {s16-s31}
-    53b6:	f3ef 820b 	mrs	r2, PSPLIM
-    53ba:	4673      	mov	r3, lr
-    53bc:	e920 0ffc 	stmdb	r0!, {r2, r3, r4, r5, r6, r7, r8, r9, sl, fp}
-    53c0:	4a0f      	ldr	r2, [pc, #60]	@ (5400 <PendSV_Handler+0x58>)
-    53c2:	6811      	ldr	r1, [r2, #0]
-    53c4:	6008      	str	r0, [r1, #0]
-    53c6:	f04f 00a0 	mov.w	r0, #160	@ 0xa0
-    53ca:	f380 8811 	msr	BASEPRI, r0
-    53ce:	f3bf 8f4f 	dsb	sy
-    53d2:	f3bf 8f6f 	isb	sy
-    53d6:	f7fd fff3 	bl	33c0 <vTaskSwitchContext>
-    53da:	f04f 0000 	mov.w	r0, #0
-    53de:	f380 8811 	msr	BASEPRI, r0
-    53e2:	4a07      	ldr	r2, [pc, #28]	@ (5400 <PendSV_Handler+0x58>)
-    53e4:	6811      	ldr	r1, [r2, #0]
-    53e6:	6808      	ldr	r0, [r1, #0]
-    53e8:	e8b0 0ffc 	ldmia.w	r0!, {r2, r3, r4, r5, r6, r7, r8, r9, sl, fp}
-    53ec:	f013 0f10 	tst.w	r3, #16
-    53f0:	bf08      	it	eq
-    53f2:	ecb0 8a10 	vldmiaeq	r0!, {s16-s31}
-    53f6:	f382 880b 	msr	PSPLIM, r2
-    53fa:	f380 8809 	msr	PSP, r0
-    53fe:	4718      	bx	r3
+    6850:	f3ef 8009 	mrs	r0, PSP
+    6854:	f01e 0f10 	tst.w	lr, #16
+    6858:	bf08      	it	eq
+    685a:	ed20 8a10 	vstmdbeq	r0!, {s16-s31}
+    685e:	f3ef 820b 	mrs	r2, PSPLIM
+    6862:	4673      	mov	r3, lr
+    6864:	e920 0ffc 	stmdb	r0!, {r2, r3, r4, r5, r6, r7, r8, r9, sl, fp}
+    6868:	4a0f      	ldr	r2, [pc, #60]	@ (68a8 <PendSV_Handler+0x58>)
+    686a:	6811      	ldr	r1, [r2, #0]
+    686c:	6008      	str	r0, [r1, #0]
+    686e:	f04f 00a0 	mov.w	r0, #160	@ 0xa0
+    6872:	f380 8811 	msr	BASEPRI, r0
+    6876:	f3bf 8f4f 	dsb	sy
+    687a:	f3bf 8f6f 	isb	sy
+    687e:	f7fd fe13 	bl	44a8 <vTaskSwitchContext>
+    6882:	f04f 0000 	mov.w	r0, #0
+    6886:	f380 8811 	msr	BASEPRI, r0
+    688a:	4a07      	ldr	r2, [pc, #28]	@ (68a8 <PendSV_Handler+0x58>)
+    688c:	6811      	ldr	r1, [r2, #0]
+    688e:	6808      	ldr	r0, [r1, #0]
+    6890:	e8b0 0ffc 	ldmia.w	r0!, {r2, r3, r4, r5, r6, r7, r8, r9, sl, fp}
+    6894:	f013 0f10 	tst.w	r3, #16
+    6898:	bf08      	it	eq
+    689a:	ecb0 8a10 	vldmiaeq	r0!, {s16-s31}
+    689e:	f382 880b 	msr	PSPLIM, r2
+    68a2:	f380 8809 	msr	PSP, r0
+    68a6:	4718      	bx	r3
         #else /* #if ( configNUMBER_OF_CORES > 1 ) */
             :: "i" ( configMAX_SYSCALL_INTERRUPT_PRIORITY )
         #endif /* #if ( configNUMBER_OF_CORES > 1 ) */
 
         );
     }
-    5400:	2101bcfc 	.word	0x2101bcfc
+    68a8:	21033644 	.word	0x21033644
 
 
 [4] DISASSEMBLY CHI TIET CUA SysTick_Handler:
 --------------------------------------------------------------------------------
-000050c8 <SysTick_Handler>:
+00006570 <SysTick_Handler>:
 #endif /* configNUMBER_OF_CORES == 1 */
 /*-----------------------------------------------------------*/
 
 void SysTick_Handler( void ) /* PRIVILEGED_FUNCTION */
 {
-    50c8:	b510      	push	{r4, lr}
+    6570:	b510      	push	{r4, lr}
     uint32_t ulPreviousMask;
 
     ulPreviousMask = portSET_INTERRUPT_MASK_FROM_ISR();
-    50ca:	f000 f959 	bl	5380 <ulSetInterruptMask>
-    50ce:	4604      	mov	r4, r0
+    6572:	f000 f959 	bl	6828 <ulSetInterruptMask>
+    6576:	4604      	mov	r4, r0
     #endif /* if ( configNUMBER_OF_CORES > 1 ) */
 
     traceISR_ENTER();
     {
         /* Increment the RTOS tick. */
         if( xTaskIncrementTick() != pdFALSE )
-    50d0:	f7fe f962 	bl	3398 <xTaskIncrementTick>
-    50d4:	b128      	cbz	r0, 50e2 <SysTick_Handler+0x1a>
+    6578:	f7fd ff82 	bl	4480 <xTaskIncrementTick>
+    657c:	b128      	cbz	r0, 658a <SysTick_Handler+0x1a>
         {
             traceISR_EXIT_TO_SCHEDULER();
             /* Pend a context switch. */
             portNVIC_INT_CTRL_REG = portNVIC_PENDSVSET_BIT;
-    50d6:	f04f 23e0 	mov.w	r3, #3758153728	@ 0xe000e000
-    50da:	f04f 5280 	mov.w	r2, #268435456	@ 0x10000000
-    50de:	f8c3 2d04 	str.w	r2, [r3, #3332]	@ 0xd04
+    657e:	f04f 23e0 	mov.w	r3, #3758153728	@ 0xe000e000
+    6582:	f04f 5280 	mov.w	r2, #268435456	@ 0x10000000
+    6586:	f8c3 2d04 	str.w	r2, [r3, #3332]	@ 0xd04
     }
     #if ( configNUMBER_OF_CORES > 1 )
         portEXIT_CRITICAL_FROM_ISR( uxSavedInterruptStatus );
     #endif /* if ( configNUMBER_OF_CORES > 1 ) */
 
     portCLEAR_INTERRUPT_MASK_FROM_ISR( ulPreviousMask );
-    50e2:	4620      	mov	r0, r4
+    658a:	4620      	mov	r0, r4
 }
-    50e4:	e8bd 4010 	ldmia.w	sp!, {r4, lr}
+    658c:	e8bd 4010 	ldmia.w	sp!, {r4, lr}
     portCLEAR_INTERRUPT_MASK_FROM_ISR( ulPreviousMask );
-    50e8:	f000 b956 	b.w	5398 <vClearInterruptMask>
+    6590:	f000 b956 	b.w	6840 <vClearInterruptMask>
 
 ================================================================================

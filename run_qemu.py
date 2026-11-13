@@ -17,7 +17,7 @@ cmd = [
 
 print("Launching QEMU:", " ".join(cmd))
 try:
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=12, env=env)
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=25, env=env)
     print(f"Process completed with exit code: {proc.returncode}")
     print("=== QEMU STDOUT ===")
     print(proc.stdout)

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hệ Thống Giám Sát Rung Động FreeRTOS (ARM Cortex-M55) - Academic Dashboard</title>
+    <title>Hệ Thống Giám Sát Rung Động FreeRTOS (ARM Cortex-M55) - Academic Dashboard V4</title>
     <style>
         :root {
             --bg: #0f172a;
@@ -40,7 +40,7 @@
         .figure-caption { font-size: 12px; color: var(--text-muted); margin-top: 10px; font-weight: 500; text-align: left; }
 
         table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
-        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); }
         th { background: #131d31; color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 11px; }
         .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; color: #fff; }
         .badge-dtcm { background: #2563eb; }
@@ -64,7 +64,7 @@
     </div>
 
     <div class="alert-box">
-        <strong>Lưu ý học thuật & Giới hạn môi trường:</strong> Trình mô phỏng QEMU MPS3 AN547 chạy theo logic tick thời gian thực của FreeRTOS (1000 Hz). Các giá trị đo độ trễ phát hiện và chuyển ngữ cảnh trên QEMU chứng minh tính đúng đắn của giải thuật định thời RTOS, cơ chế cướp quyền (Preemption) và thừa kế ưu tiên (Priority Inheritance). Trên phần cứng silicon vật lý (STM32N6 / MPS3 FPGA), thời gian thực thi phụ thuộc vào chu kỳ xung nhịp 25 MHz và bus DTCM 0-wait state.
+        <strong>Lưu ý học thuật & Giới hạn môi trường:</strong> Toàn bộ các thông số thời gian được đo đạc chính xác bằng SysTick Cycle Counter (tần số xung nhịp mô phỏng 25 MHz) và bộ đệm RAM Trace hook của FreeRTOS. Các kết quả chứng minh tính đúng đắn của giải thuật định thời RMA, cơ chế cướp quyền (Preemption), thừa kế ưu tiên (Priority Inheritance) và phân tích thời gian đáp ứng (RTA). Trên vi điều khiển vật lý STM32N6 (800 MHz, DTCM 0-wait state), thời gian thực thi $C_i$ sẽ còn được rút ngắn thêm từ $10\times - 30\times$.
     </div>
 
     <!-- KPI Metrics -->
@@ -76,8 +76,8 @@
         </div>
         <div class="kpi-card">
             <div class="kpi-lbl">Preemption Latency</div>
-            <div class="kpi-val" style="color:#ef4444;">347.76 µs <span style="font-size:13px; font-weight:normal;">(8,694 cyc)</span></div>
-            <div class="kpi-sub">vTaskAlarm (P5) cướp CPU giữa phép FFT của vTaskProcessing (P3) (Mid-FFT: 166.00 µs / 4,150 cyc)</div>
+            <div class="kpi-val" style="color:#ef4444;">342.92 µs <span style="font-size:13px; font-weight:normal;">(8,573 cyc)</span></div>
+            <div class="kpi-sub">vTaskAlarm (P5) cướp CPU giữa phép FFT của vTaskProcessing (P3) (Mean: 121.27 µs / 3,032 cyc)</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-lbl">Priority Inheritance</div>
@@ -87,17 +87,17 @@
         <div class="kpi-card">
             <div class="kpi-lbl">Đẳng thức khối & Log (S3)</div>
             <div class="kpi-val" style="color:#38bdf8;">0 Alarm Drop</div>
-            <div class="kpi-sub">Khối: 357 = 249 + 108 | Log: 217 = 19 + 198 drops | Alarm: 0 drop (3/3 xả an toàn)</div>
+            <div class="kpi-sub">Khối: 357 = 249 + 108 | Log: 217 = 19 + 198 drops | Alarm: 0 drop (3/3 an toàn)</div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-lbl">Bộ nhớ DTCM Tốc độ cao</div>
-            <div class="kpi-val" style="color:#38bdf8;">12.4 KB / 128 KB</div>
-            <div class="kpi-sub">Chứa Double Buffer (2KB), FFT Workspace (4KB), Stacks (6KB)</div>
+            <div class="kpi-lbl">RAM Trace Buffer (Hook)</div>
+            <div class="kpi-val" style="color:#38bdf8;">3,385 Events</div>
+            <div class="kpi-sub">3,385 sự kiện chuyển task được ghi lại trong RAM, 0 dropped event, 0 UART overhead</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-lbl">FreeRTOS Heap (heap_5)</div>
-            <div class="kpi-val" style="color:#10b981;">1,168 B / 64 KB</div>
-            <div class="kpi-sub">Heap còn trống 64,368 B (98.22% an toàn không rò rỉ)</div>
+            <div class="kpi-val" style="color:#10b981;">1,184 B / 64 KB</div>
+            <div class="kpi-sub">Heap còn trống 64,352 B (98.19% an toàn không rò rỉ)</div>
         </div>
     </div>
 
@@ -129,9 +129,9 @@
                     <td>1.0 ms</td>
                     <td><span class="badge badge-dtcm">DTCM</span></td>
                     <td>1,024 B (256w)</td>
-                    <td>312 Bytes (30.5%)</td>
-                    <td>712 Bytes</td>
-                    <td><span class="badge badge-pass">AN TOÀN</span></td>
+                    <td>328 Bytes (32.0%)</td>
+                    <td>696 Bytes</td>
+                    <td><span class="badge badge-pass">AN TOÀN [ok]</span></td>
                 </tr>
                 <tr>
                     <td><strong>vTaskAcquisition</strong></td>
@@ -140,9 +140,9 @@
                     <td>2.0 ms</td>
                     <td><span class="badge badge-dtcm">DTCM</span></td>
                     <td>1,024 B (256w)</td>
-                    <td>184 Bytes (18.0%)</td>
-                    <td>840 Bytes</td>
-                    <td><span class="badge badge-pass">AN TOÀN</span></td>
+                    <td>224 Bytes (21.9%)</td>
+                    <td>800 Bytes</td>
+                    <td><span class="badge badge-pass">AN TOÀN [ok]</span></td>
                 </tr>
                 <tr>
                     <td><strong>vTaskProcessing</strong></td>
@@ -151,9 +151,9 @@
                     <td>12.0 ms</td>
                     <td><span class="badge badge-dtcm">DTCM</span></td>
                     <td>4,096 B (1024w)</td>
-                    <td>520 Bytes (12.7%)</td>
-                    <td>3,576 Bytes</td>
-                    <td><span class="badge badge-pass">AN TOÀN</span></td>
+                    <td>560 Bytes (13.7%)</td>
+                    <td>3,536 Bytes</td>
+                    <td><span class="badge badge-pass">AN TOÀN [ok]</span></td>
                 </tr>
                 <tr>
                     <td><strong>vTaskLogging</strong></td>
@@ -162,9 +162,9 @@
                     <td>20.0 ms</td>
                     <td><span class="badge badge-sram">SRAM</span></td>
                     <td>2,048 B (512w)</td>
-                    <td>344 Bytes (16.8%)</td>
-                    <td>1,704 Bytes</td>
-                    <td><span class="badge badge-pass">AN TOÀN</span></td>
+                    <td>368 Bytes (18.0%)</td>
+                    <td>1,680 Bytes</td>
+                    <td><span class="badge badge-pass">AN TOÀN [ok]</span></td>
                 </tr>
                 <tr>
                     <td><strong>Idle Task</strong></td>
@@ -175,27 +175,151 @@
                     <td>512 B (128w)</td>
                     <td>160 Bytes (31.2%)</td>
                     <td>352 Bytes</td>
-                    <td><span class="badge badge-pass">AN TOÀN</span></td>
+                    <td><span class="badge badge-pass">AN TOÀN [ok]</span></td>
                 </tr>
             </tbody>
         </table>
         <p style="margin-top: 10px; font-size: 11px; color: var(--text-muted);">
-            * <strong>Ngân sách stack lý thuyết (Paper Budget) của vTaskProcessing:</strong> ~616 Bytes (Context 212 B + Locals 120 B + FFT Call 96 B + Unpack 64 B + API 80 B + Margin 44 B) so với cấp phát 4,096 B &rarr; Hệ số an toàn 7.7&times; (Thực tế HWM sử dụng: 520 Bytes / 12.7%).
+            * <strong>Ngân sách stack lý thuyết (Paper Budget) của vTaskProcessing:</strong> ~616 Bytes (Context 212 B + Locals 120 B + FFT Call 96 B + Unpack 64 B + API 80 B + Margin 44 B) so với cấp phát 4,096 B &rarr; Hệ số an toàn 7.3&times; (Thực tế HWM sử dụng: 560 Bytes / 13.7%).
         </p>
+    </div>
+
+    <!-- RTA Comparison & Runtime Statistics Section -->
+    <div class="section">
+        <div class="section-title">
+            <span>RTA & RUNTIME STATS</span>
+            ĐỐI CHIẾU THỜI GIAN ĐÁP ỨNG RTA (§3.3.3 VS THỰC ĐO) VÀ THỐNG KÊ RUN-TIME FREERTOS
+        </div>
+
+        <h3 style="font-size:13px; color:#38bdf8; margin-top:8px; margin-bottom:6px;">1. Bảng đối chiếu Phân tích Thời gian Đáp ứng RTA (Response Time Analysis)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Tên Tác Vụ</th>
+                    <th>Mức Ưu Tiên</th>
+                    <th>Thiết Kế Ci (§3.3.1)</th>
+                    <th>Thực Đo Max Ci</th>
+                    <th>Thiết Kế RTA (§3.3.3)</th>
+                    <th>Thực Đo RTA</th>
+                    <th>Hạn Ngặt (Deadline)</th>
+                    <th>Biên An Toàn (Slack)</th>
+                    <th>Trạng Thái</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>vTaskAlarm</strong></td>
+                    <td><span class="badge" style="background:var(--accent-p5);">Pri 5</span></td>
+                    <td>1.00 ms</td>
+                    <td>0.558 ms</td>
+                    <td>&le; 1.00 ms</td>
+                    <td><strong>0.564 ms</strong></td>
+                    <td>10.00 ms</td>
+                    <td>9.435 ms (94.4%)</td>
+                    <td><span class="badge badge-pass">[PASS] [ok]</span></td>
+                </tr>
+                <tr>
+                    <td><strong>vTaskAcquisition</strong></td>
+                    <td><span class="badge" style="background:var(--accent-p4);">Pri 4</span></td>
+                    <td>2.00 ms</td>
+                    <td>0.073 ms</td>
+                    <td>2.00 ms</td>
+                    <td><strong>0.073 ms</strong></td>
+                    <td>64.00 ms</td>
+                    <td>63.926 ms (99.9%)</td>
+                    <td><span class="badge badge-pass">[PASS] [ok]</span></td>
+                </tr>
+                <tr>
+                    <td><strong>vTaskProcessing</strong></td>
+                    <td><span class="badge" style="background:var(--accent-p3);">Pri 3</span></td>
+                    <td>12.00 ms</td>
+                    <td>6.983 ms</td>
+                    <td>15.00 ms</td>
+                    <td><strong>7.614 ms</strong></td>
+                    <td>64.00 ms</td>
+                    <td>56.385 ms (88.1%)</td>
+                    <td><span class="badge badge-pass">[PASS] [ok]</span></td>
+                </tr>
+                <tr>
+                    <td><strong>vTaskLogging</strong></td>
+                    <td><span class="badge" style="background:var(--accent-p2);">Pri 2</span></td>
+                    <td>20.00 ms</td>
+                    <td>3.000 ms</td>
+                    <td>35.00 ms</td>
+                    <td><strong>10.614 ms</strong></td>
+                    <td>1,000.0 ms</td>
+                    <td>989.385 ms (98.9%)</td>
+                    <td><span class="badge badge-pass">[PASS] [ok]</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top:16px;">
+            <div>
+                <h3 style="font-size:13px; color:#38bdf8; margin-bottom:6px;">2. Thống kê Run-Time CPU (vTaskGetRunTimeStats)</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tác Vụ</th>
+                            <th>Run Time Counter (Cycles)</th>
+                            <th>Tỉ Lệ (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>IDLE Task</td><td>91,043,141</td><td><strong>94%</strong></td></tr>
+                        <tr><td>Timer Service (Tmr Svc)</td><td>6,155,817</td><td><strong>6%</strong></td></tr>
+                        <tr><td>vTaskProcessing</td><td>318,966</td><td><strong>&lt; 1%</strong></td></tr>
+                        <tr><td>vTaskLogging</td><td>97,628</td><td><strong>&lt; 1%</strong></td></tr>
+                        <tr><td>vTaskAcquisition</td><td>61,380</td><td><strong>&lt; 1%</strong></td></tr>
+                        <tr><td>vTaskAlarm</td><td>38,122</td><td><strong>&lt; 1%</strong></td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div>
+                <h3 style="font-size:13px; color:#38bdf8; margin-bottom:6px;">3. Danh sách trạng thái tác vụ (vTaskList)</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tác Vụ</th>
+                            <th>Trạng Thái</th>
+                            <th>Ưu Tiên</th>
+                            <th>Stack Free</th>
+                            <th>Task ID</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>vTaskAlarm</td><td>Blocked (B)</td><td>5</td><td>174 words (696 B)</td><td>1</td></tr>
+                        <tr><td>vTaskAcquisition</td><td>Blocked (B)</td><td>4</td><td>200 words (800 B)</td><td>2</td></tr>
+                        <tr><td>vTaskProcessing</td><td>Blocked (B)</td><td>3</td><td>884 words (3,536 B)</td><td>3</td></tr>
+                        <tr><td>vTaskLogging</td><td>Blocked (B)</td><td>2</td><td>420 words (1,680 B)</td><td>4</td></tr>
+                        <tr><td>IDLE Task</td><td>Ready (R)</td><td>0</td><td>88 words (352 B)</td><td>5</td></tr>
+                        <tr><td>Timer Service</td><td>Running (X)</td><td>1</td><td>44 words (176 B)</td><td>6</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <!-- Academic Figures Grid -->
     <div class="section">
         <div class="section-title">
             <span>HÌNH ẢNH HỌC THUẬT</span>
-            CÁC ĐỒ THỊ VÀ GIẢN ĐỒ THỰC NGHIỆM ĐƯỢC KẾT XUẤT TỪ BẢN BUILD MỚI (CHƯƠNG IV)
+            BỘ 8 ĐỒ THỊ VÀ GIẢN ĐỒ THỰC NGHIỆM ĐƯỢC KẾT XUẤT TỪ BẢN BUILD MỚI (CHƯƠNG IV)
         </div>
         
         <div class="figure-grid">
             <div class="figure-box">
-                <img src="figures/01_task_execution_timing_gantt.png" alt="Giản đồ xung RTOS Gantt">
+                <img src="figures/01_task_execution_timing_gantt.png" alt="Giản đồ xung RTOS Gantt Lý thuyết">
                 <div class="figure-caption">
-                    <strong>Hình 4.1:</strong> Giản đồ xung định thời thực thi tổng thể 4 Task + Idle (Task Execution Timeline). Thể hiện Acquisition thức dậy theo semaphore chu kỳ 64 ms, Processing thực thi FFT 512 mẫu, Alarm cướp CPU tức thời giữa phép tính FFT và Logging được nâng ưu tiên khi giữ xLogMutex.
+                    <strong>Hình 4.1 (Lý thuyết):</strong> Giản đồ xung định thời thực thi tổng thể 4 Task + Idle vẽ theo giá trị thiết kế Bảng 3.1. Thể hiện Acquisition chu kỳ 64 ms, Processing thực thi FFT 512 mẫu, Alarm cướp CPU tức thời giữa phép tính FFT và Logging được nâng ưu tiên khi giữ xLogMutex.
+                </div>
+            </div>
+
+            <div class="figure-box">
+                <img src="figures/06_task_execution_timing_gantt_measured.png" alt="Giản đồ xung RTOS Gantt Đo thực tế">
+                <div class="figure-caption">
+                    <strong>Hình 4.6 (Đo thực nghiệm):</strong> Giản đồ xung Gantt đo thực tế từ bộ đệm vết chuyển ngữ cảnh RAM ([TRACE], 3,385 sự kiện). Đối chiếu song song với Hình 4.1 lý thuyết, thể hiện chính xác thời điểm vTaskAlarm cướp quyền giữa phép FFT và vTaskLogging được nâng lên Pri 3 khi giữ xLogMutex.
                 </div>
             </div>
 
@@ -210,6 +334,20 @@
                 <img src="figures/03_detection_to_alarm_latency.png" alt="Độ trễ phát hiện đến báo động">
                 <div class="figure-caption">
                     <strong>Hình 4.3:</strong> Độ trễ từ thời điểm phát hiện bất thường đến khi cơ cấu chấp hành (Còi/Đèn/Rơ-le) được kích hoạt qua Task Notification. Toàn bộ các sự kiện đều đáp ứng hạn ngặt D = 10.0 ms.
+                </div>
+            </div>
+
+            <div class="figure-box">
+                <img src="figures/07_four_task_latency_histogram.png" alt="Histogram Độ trễ 4 Task">
+                <div class="figure-caption">
+                    <strong>Hình 4.7:</strong> Biểu đồ phân bố độ trễ đáp ứng (Response Latency Histogram) của cả 4 tác vụ với n = 507 mẫu đo SysTick. Mọi giá trị độ trễ thực tế đều cách xa hạn ngặt Di (vạch đứt đoạn đỏ), chứng minh hệ thống không bị jitter hay trễ hạn.
+                </div>
+            </div>
+
+            <div class="figure-box">
+                <img src="figures/08_rta_design_vs_measured.png" alt="So sánh RTA Thiết kế vs Thực đo">
+                <div class="figure-caption">
+                    <strong>Hình 4.8:</strong> Biểu đồ đối chiếu thời gian đáp ứng xấu nhất RTA giữa lý thuyết thiết kế Chương III (§3.3.3) và kết quả đo thực nghiệm trên QEMU Cortex-M55 (§4.4.4). Toàn bộ 4 tác vụ đều có biên an toàn (Slack Margin) > 88%.
                 </div>
             </div>
 

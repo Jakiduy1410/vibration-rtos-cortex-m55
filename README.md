@@ -84,7 +84,7 @@ Trước khi khởi động Scheduler, firmware tự động thực thi Suite 4 
 
 ### Kịch bản 2: Kiểm chứng Preemption thật & Priority Inheritance
 - **Phần A (Real Mid-FFT Preemption)**: Khi `vTaskProcessing` (Pri 3) đang thực thi biến đổi Fourier, ngắt phần mềm `Interrupt1_IRQn` được kích hoạt từ hook `rfft_mid_stage_hook()` ngay giữa các tầng bướm tính toán FFT. `vTaskAlarm` (Pri 5) lập tức cướp quyền CPU giữa chừng phép tính FFT, xác thực bất đẳng thức thời gian 4 điểm:
-  `[Preemption] Preemption verified! [PASS] [ok] t_start=51210956 < t_irq=51220848 <= t_actuate=51224998 < t_end=51241696 (cycles)`.
+  `[Preemption] Preemption verified! [PASS] [ok] t_start=51207900 < t_irq=51215740 <= t_actuate=51224313 < t_end=51224998 (cycles)`.
   Sau khi hoàn tất đóng rơ-le an toàn, quyền điều khiển được trả lại cho `vTaskProcessing` tiếp tục tính toán hoàn tất không lỗi. $\rightarrow$ **PASS [ok]**.
 - **Phần B (Genuine Priority Inheritance)**: Tranh chấp 3 task thật trên `xLogMutex` (§3.3.3 Chương III). `vTaskLogging` (Pri 2) giữ `xLogMutex`. `vTaskProcessing` (Pri 3) yêu cầu Mutex và bị chặn. FreeRTOS kernel tự động nâng ưu tiên của `vTaskLogging` từ 2 lên **3**. Khi `vTaskAcquisition` (Pri 4) thức dậy, do có ưu tiên cao hơn (4 > 3), tác vụ Thu thập cướp CPU thành công (`Step 4: Acquisition arrives -> Preempts boosted Logging`). Sau khi giải phóng Mutex, ưu tiên của `vTaskLogging` tự động khôi phục về mức gốc **2**. Cấm tuyệt đối `vTaskPrioritySet` để mô phỏng.
   *Ghi chú kiểm thử xác định*: Việc dừng timer DMA và kích hoạt ngắt `Interrupt0_IRQn` bằng tay qua `NVIC_SetPendingIRQ()` trong demo là kỹ thuật chuẩn của kiểm thử RTOS xác định (Deterministic Testing). Việc giữ Mutex xuyên suốt chuỗi demo là có chủ đích, bởi thao tác sao chép 1 bản ghi 32 B chỉ tốn ~10 chu kỳ CPU ($0.4\ \mu\text{s}$ ở 25 MHz), không đủ thời gian để task Pri 4 bất đồng bộ xuất hiện nếu không có dàn dựng đồng bộ. $\rightarrow$ **PASS [ok]**.
@@ -102,7 +102,7 @@ Trước khi khởi động Scheduler, firmware tự động thực thi Suite 4 
 
 ```text
 ====================================================================
-       TONG KET SO LIEU THUC NGHIEM TOAN DIEN (CHUONG IV - V3)     
+       TONG KET SO LIEU THUC NGHIEM TOAN DIEN (CHUONG IV - V4)     
 ====================================================================
 [1] THONG KE KHOI DU LIEU VA LOG (DANG THUC TOAN HOC):
     - Tong so khoi sinh ra (Generated)   : 357
@@ -122,32 +122,43 @@ Trước khi khởi động Scheduler, firmware tự động thực thi Suite 4 
     - Log canh bao bi drop (Alarm Drop)  : 0 -> 0 BAN GHI CANH BAO MAT TRONG LAN CHAY NAY (3 canh bao / queue sau 8, xa moi 1000 ms) [PASS] [ok]
 
 [3] DO TRE PHAT HIEN -> BAO DONG (DO CHU KY SYSTICK):
-    - Do tre cuc dai (Max Latency)       : 8694 cycles (347.76 us)
-    - Do tre trung binh (Mean Latency)   : 4004 cycles (160.16 us)
-    * Ghi chu hoc thuat: So lieu do bang SysTick tren QEMU MPS3 AN547 (25 MHz).
+    - Do tre cuc dai (Max Latency)       : 8573 cycles (342.92 us)
+    - Do tre trung binh (Mean Latency)   : 3032 cycles (121.27 us)
+    * Ghi chu học thuật: So lieu do bang SysTick tren QEMU MPS3 AN547 (25 MHz).
       Khong phai so do dao dong ky tren phan cung that STM32N6.
 
 [4] THONG KE FREERTOS HEAP (heap_5.c - SRAM 64 KB):
     - Tong dung luong Heap cau hinh      : 65536 Bytes (64 KB)
-    - Heap con trong hien tai (Free)     : 64368 Bytes (98.22%)
-    - Heap da cap phat thuc te (Used)    : 1168 Bytes (1.78%)
+    - Heap con trong hien tai (Free)     : 64352 Bytes (98.19%)
+    - Heap da cap phat thuc te (Used)    : 1184 Bytes (1.81%)
 
 [5] BANG THEO DOI NGAN XEP (STACK HWM SO VOI BANG 3.1 CHUONG III):
 --------------------------------------------------------------------------------
 Task Name        | Prio | Memory | Alloc (Bytes) | Free HWM (Bytes) | Used (Bytes)
 --------------------------------------------------------------------------------
-vTaskAlarm       |  5   |  DTCM  |  1024 (256w)  |  712 Bytes       |  312 Bytes
-vTaskAcquisition |  4   |  DTCM  |  1024 (256w)  |  840 Bytes       |  184 Bytes
-vTaskProcessing  |  3   |  DTCM  |  4096 (1024w) |  3576 Bytes       |  520 Bytes
-vTaskLogging     |  2   |  SRAM  |  2048 (512w)  |  1704 Bytes       |  344 Bytes
+vTaskAlarm       |  5   |  DTCM  |  1024 (256w)  |  696 Bytes       |  328 Bytes
+vTaskAcquisition |  4   |  DTCM  |  1024 (256w)  |  800 Bytes       |  224 Bytes
+vTaskProcessing  |  3   |  DTCM  |  4096 (1024w) |  3536 Bytes       |  560 Bytes
+vTaskLogging     |  2   |  SRAM  |  2048 (512w)  |  1680 Bytes       |  368 Bytes
 Idle Task        |  0   |  SRAM  |   512 (128w)  |  352 Bytes       |  160 Bytes
 --------------------------------------------------------------------------------
 Ngan sach ly thuyet vTaskProcessing (Paper Budget): ~616 Bytes
   (Context: 212 B + Locals: 120 B + FFT Call: 96 B + Unpack: 64 B + API: 80 B + Margin: 44 B)
-  -> So voi cap phat 4096 B: He so an toan 7.7x (Thuc te HWM su dung: 520 Bytes / 12.9%)
+  -> So voi cap phat 4096 B: He so an toan 7.3x (Thuc te HWM su dung: 560 Bytes / 13.7%)
 --------------------------------------------------------------------------------
 Ghi chu: Free HWM la so byte ngan xep toi thieu con du chua tung bi cham toi.
 Ket luan: [PASS] [ok] Moi Task deu thoa man: Used < Alloc (Khong vuot ngan sach).
+
+[6] DOI CHIEU THOI GIAN DAP UNG RTA: THIET KE VS THUC DO (§3.3.3 VS §4.4.4):
+----------------------------------------------------------------------------------------------------
+Task Name        | Prio | Design Ci | Meas Max Ci | Design RTA | Meas RTA   | Deadline  | Slack Margin | Status
+-----------------|------|-----------|-------------|------------|------------|-----------|--------------|--------
+vTaskAlarm       |  5   | 1.00 ms   |   0.558 ms |  <=1.0 ms  |   0.564 ms | 10.00 ms  |   9.435 ms | [PASS] [ok]
+vTaskAcquisition |  4   | 2.00 ms   |   0.073 ms |  2.00 ms   |   0.073 ms | 64.00 ms  |   63.926 ms | [PASS] [ok]
+vTaskProcessing  |  3   | 12.00 ms  |   6.983 ms |  15.00 ms  |   7.614 ms | 64.00 ms  |   56.385 ms | [PASS] [ok]
+vTaskLogging     |  2   | 20.00 ms  |   3.000 ms |  35.00 ms  |   10.614 ms | 1000.0ms  |   989.385 ms | [PASS] [ok]
+----------------------------------------------------------------------------------------------------
+Ghi chu: Toan bo 4 tac vu deu dat bien an toan (Slack Margin) > 88%, khong co deadline miss.
 ====================================================================
 ```
 
@@ -228,7 +239,7 @@ python plot_figures.py
 ├── README.md                     # Tài liệu học thuật hướng dẫn và tổng kết hệ thống
 ├── run_qemu.py                   # Script tự động thực thi mô phỏng và thu thập log UART
 ├── generate_reports.py           # Script tự động phân tích ELF/MAP và trích xuất báo cáo
-├── plot_figures.py               # Script kết xuất 5 biểu đồ học thuật độ phân giải 300 DPI
+├── plot_figures.py               # Script kết xuất 8 biểu đồ học thuật độ phân giải 300 DPI
 ├── include/
 │   └── FreeRTOSConfig.h          # Cấu hình Kernel FreeRTOS 11.1.0 (Pri=6, MVE=1, FPU=1)
 ├── src/
@@ -244,11 +255,15 @@ python plot_figures.py
     ├── 03_simulation_logs.txt    # Toàn bộ nhật ký chạy thực tế của 3 kịch bản trên QEMU
     ├── 04_context_switch_analysis.txt # Disassembly chi tiết PendSV_Handler và SysTick
     ├── 05_gdb_register_dump.txt  # Snapshot trạng thái thanh ghi CPU thực tế khi Exception 14
-    ├── interactive_dashboard.html# Dashboard tương tác trực quan (Academic Dashboard)
-    └── figures/                  # Bộ 5 hình vẽ học thuật 300 DPI dùng cho báo cáo
-        ├── 01_task_execution_timing_gantt.png
-        ├── 02_fft_spectrum_normal_vs_anomaly.png
-        ├── 03_detection_to_alarm_latency.png
-        ├── 04_memory_and_stack_hwm.png
-        └── 05_scenario_summary_dashboard.png
+    ├── 06_measured_rta_and_runtime_stats.txt # Báo cáo đo lường RTA thực tế và thống kê Run-Time
+    ├── interactive_dashboard.html# Dashboard tương tác trực quan (Academic Dashboard V4)
+    └── figures/                  # Bộ 8 hình vẽ học thuật 300 DPI dùng cho báo cáo
+        ├── 01_task_execution_timing_gantt.png            # Hình 4.1: Gantt định thời lý thuyết (§3.1)
+        ├── 02_fft_spectrum_normal_vs_anomaly.png         # Hình 4.2: Phổ FFT bình thường vs lỗi
+        ├── 03_detection_to_alarm_latency.png             # Hình 4.3: Timeline độ trễ phát hiện đến báo động
+        ├── 04_memory_and_stack_hwm.png                   # Hình 4.4: Phân bổ bộ nhớ & Stack HWM
+        ├── 05_scenario_summary_dashboard.png             # Hình 4.5: Dashboard tổng kết 3 kịch bản
+        ├── 06_task_execution_timing_gantt_measured.png   # Hình 4.6: Gantt đo thực tế từ RAM Trace ([TRACE])
+        ├── 07_four_task_latency_histogram.png            # Hình 4.7: Histogram độ trễ đáp ứng 4 Task
+        └── 08_rta_design_vs_measured.png                 # Hình 4.8: Đối chiếu RTA thiết kế vs thực đo
 ```

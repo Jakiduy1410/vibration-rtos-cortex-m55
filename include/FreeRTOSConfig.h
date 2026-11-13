@@ -54,10 +54,17 @@
 #define configGENERATE_RUN_TIME_STATS           1
 #define configUSE_TRACE_FACILITY                1
 #define configUSE_STATS_FORMATTING_FUNCTIONS    1
+#define configSTATS_BUFFER_MAX_LENGTH           ( ( size_t ) 1024 )
 
-extern volatile uint32_t ulHighFrequencyTimerTicks;
-#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS() ( ulHighFrequencyTimerTicks = 0UL )
-#define portGET_RUN_TIME_COUNTER_VALUE()         ( ulHighFrequencyTimerTicks )
+uint32_t ulGetRunTimeCounterValue(void);
+#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS() do {} while (0)
+#define portGET_RUN_TIME_COUNTER_VALUE()         ulGetRunTimeCounterValue()
+
+/* Task switch trace hooks for sub-microsecond RAM execution timeline */
+void vTaskTraceSwitchedIn(void);
+void vTaskTraceSwitchedOut(void);
+#define traceTASK_SWITCHED_IN()                  vTaskTraceSwitchedIn()
+#define traceTASK_SWITCHED_OUT()                 vTaskTraceSwitchedOut()
 
 /* Software timer definitions. */
 #define configUSE_TIMERS                        1
