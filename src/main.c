@@ -1,11 +1,11 @@
 /*
  * Real-Time Vibration Monitoring & Anomaly Alarm System
- * Conforming strictly to Chapter III Design & Specifications
+ * Four-task application; functional verification, no cycle-accurate claims
  *
  * Platform: ARM MPS3 FPGA Prototyping Board (AN547)
  * Core    : ARM Cortex-M55 (ARMv8.1-M Mainline with Helium MVE & Hard-Float FPU)
  * RTOS    : FreeRTOS Kernel V11.1.0 (Port: ARM_CM55_NTZ/non_secure)
- * DSP     : ARM CMSIS-DSP 5.9.0 (Helium Optimized 512-point Real FFT @ 8 kHz)
+ * DSP     : CMSIS-DSP 1.10.0 from CMSIS 5.9.0; 512-point Real FFT @ 8 kHz
  */
 
 #include <stdint.h>
@@ -46,9 +46,9 @@
 /* Sparse logging ratio in normal condition: 1 in 16 blocks (~1.0s at 64 ms/block) */
 #define SPARSE_LOG_RATIO            16
 
-/* CPU Clock frequency on QEMU MPS3 AN547 emulation: 25 MHz (40 ns per cycle) */
-#define SYSTEM_CLOCK_FREQ_HZ        25000000UL
-#define SYSTICK_RELOAD_CYCLES       (SYSTEM_CLOCK_FREQ_HZ / configTICK_RATE_HZ) /* 25,000 cycles/tick */
+/* CPU Clock frequency on QEMU MPS3 AN547 emulation: 32 MHz system clock (APB peripheral clock is 25 MHz) */
+#define SYSTEM_CLOCK_FREQ_HZ        32000000UL
+#define SYSTICK_RELOAD_CYCLES       (SYSTEM_CLOCK_FREQ_HZ / configTICK_RATE_HZ) /* nominal 32,000 clock ticks per RTOS tick */
 
 /*----------------------------------------------------------------------------
  * Type Definitions (Conforming strictly to Chapter III §2.2 & Task-round2)
@@ -61,7 +61,6 @@ typedef struct {
     uint32_t timestamp_ms;      /* Timestamp when block was acquired */
     uint8_t anomaly_type;       /* 0=None, 1=Bearing fault harmonic, 2=Severe imbalance */
     uint8_t overrun_flag;       /* 1 if buffer overrun occurred */
-    uint64_t t_ready_cycles;    /* Cycle timestamp when block was queued (Processing t_ready) */
 } BlockDescriptor_t;
 
 /* 2. Structured Log Entry for xLogQueue & xAlarmLogQueue - EXACTLY 32 Bytes */
@@ -98,25 +97,29 @@ typedef struct {
     volatile uint32_t alarm_logs_written;
     volatile uint32_t alarm_logs_dropped;       /* Must remain 0 under all conditions */
 
-    volatile uint32_t last_alarm_latency_cycles;
-    volatile uint32_t max_alarm_latency_cycles;
-    volatile uint32_t min_alarm_latency_cycles;
-    volatile uint64_t total_alarm_latency_cycles;
-    volatile uint32_t latency_sample_count;
 } SystemStats_t;
 
 static SystemStats_t g_stats = { 0 };
+static SystemStats_t g_phase_stats[4] = { { 0 } };
+extern volatile uint32_t g_current_scenario;
+static volatile uint32_t g_alarm_output_state = 0;
+static volatile uint32_t g_test_alarm_count = 0;
+static volatile bool g_s2_fft_active = false;
+static volatile bool g_s2_irq_seen = false;
+static volatile bool g_s2_alarm_during_fft = false;
 
 /* Safe atomic statistics update macros */
 #define STATS_INC(field) do { \
     taskENTER_CRITICAL(); \
     g_stats.field++; \
+    g_phase_stats[g_current_scenario].field++; \
     taskEXIT_CRITICAL(); \
 } while(0)
 
 #define STATS_INC_FROM_ISR(field) do { \
     UBaseType_t uxSaved = taskENTER_CRITICAL_FROM_ISR(); \
     g_stats.field++; \
+    g_phase_stats[g_current_scenario].field++; \
     taskEXIT_CRITICAL_FROM_ISR(uxSaved); \
 } while(0)
 
@@ -178,7 +181,7 @@ static QueueHandle_t     xLogQueue            = NULL; /* Depth 8 x 32-Byte: Norm
 static QueueHandle_t     xAlarmLogQueue       = NULL; /* Depth 8 x 32-Byte: Critical alarms (0 Dropped) */
 static SemaphoreHandle_t xLogMutex            = NULL; /* Mutex with Priority Inheritance */
 
-/* Signal semaphores for genuine priority inheritance testing */
+/* Signal semaphores for specialized priority inheritance testing */
 static SemaphoreHandle_t xInheritSignalSem    = NULL;
 static SemaphoreHandle_t xInheritDoneSem      = NULL;
 
@@ -202,10 +205,6 @@ static volatile uint32_t g_s1_detected_block14 = 0;
 
 /* Scenario 2 Mid-FFT Preemption tracking */
 volatile bool     g_s2_preempt_armed         = false;
-volatile uint64_t g_s2_t_fft_start           = 0;
-volatile uint64_t g_s2_t_mid_fft_irq         = 0;
-volatile uint64_t g_s2_t_alarm_actuate       = 0;
-volatile uint64_t g_s2_t_fft_end             = 0;
 volatile bool     g_s2_preempt_verified      = false;
 
 /* Scenario 2 Priority Inheritance tracking */
@@ -224,183 +223,11 @@ static volatile uint8_t  g_buf_overrun[2]      = { 0, 0 }; /* Reset on buffer re
 static volatile uint32_t g_block_seq_cnt       = 0;
 
 /* Latency measurement cycle timestamp */
-static volatile uint64_t g_detect_cycle        = 0;
 
 /* Ready timestamps for all 4 real-time tasks */
-static volatile uint64_t g_alarm_ready_cycle             = 0;
-static volatile uint64_t g_acq_ready_cycle               = 0;
-static volatile uint64_t g_log_notify_ready_cycle         = 0;
-static volatile uint64_t g_log_next_periodic_ready_cycle = 0;
 
 /* High frequency timer ticks for run-time statistics backward compatibility */
 volatile uint32_t ulHighFrequencyTimerTicks = 0;
-
-/*----------------------------------------------------------------------------
- * High-Resolution Timing via SysTick (Sub-microsecond resolution on QEMU)
- *----------------------------------------------------------------------------*/
-static inline uint64_t get_system_cycles(void)
-{
-    if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
-        return 0;
-    }
-    uint32_t ticks1, ticks2, val;
-    BaseType_t in_isr = xPortIsInsideInterrupt();
-    do {
-        ticks1 = in_isr ? xTaskGetTickCountFromISR() : xTaskGetTickCount();
-        val    = SysTick->VAL;
-        ticks2 = in_isr ? xTaskGetTickCountFromISR() : xTaskGetTickCount();
-    } while (ticks1 != ticks2);
-
-    /* SysTick counts downwards from 24,999 to 0 */
-    uint64_t elapsed_in_tick = (uint64_t)(SYSTICK_RELOAD_CYCLES - 1UL - val);
-    return ((uint64_t)ticks1 * (uint64_t)SYSTICK_RELOAD_CYCLES) + elapsed_in_tick;
-}
-
-/* FreeRTOS port runtime statistics counter value callback */
-uint32_t ulGetRunTimeCounterValue(void)
-{
-    return (uint32_t)get_system_cycles();
-}
-
-/*----------------------------------------------------------------------------
- * Sub-Microsecond RAM Execution Trace Buffer (Task Switching Timeline)
- *----------------------------------------------------------------------------*/
-#define MAX_TRACE_ENTRIES 8192
-
-typedef struct {
-    uint32_t tick_ms;
-    uint32_t cycles;       /* lower 32 bits of get_system_cycles() */
-    uint8_t  task_id;      /* 0=Idle, 1=Alarm, 2=Acq, 3=Proc, 4=Log, 5=Timer/Other */
-    uint8_t  event;        /* 1=IN, 0=OUT */
-} __attribute__((packed)) TraceEntry_t;
-
-static TraceEntry_t      g_trace_buffer[MAX_TRACE_ENTRIES];
-static volatile uint32_t g_trace_count    = 0;
-static volatile bool     g_trace_enabled  = true;
-static volatile bool     g_trace_overflow = false;
-
-static inline uint8_t get_task_id(TaskHandle_t h)
-{
-    if (h == xTaskAlarmHandle) return 1; /* Alarm */
-    if (h == xTaskAcqHandle)   return 2; /* Acquisition */
-    if (h == xTaskProcHandle)  return 3; /* Processing */
-    if (h == xTaskLogHandle)   return 4; /* Logging */
-    if (h == (TaskHandle_t)&xIdleTCB) return 0; /* Idle */
-    return 5; /* Timer / Other */
-}
-
-static const char *get_task_name_by_id(uint8_t id)
-{
-    switch (id) {
-        case 0: return "Idle";
-        case 1: return "Alarm";
-        case 2: return "Acquisition";
-        case 3: return "Processing";
-        case 4: return "Logging";
-        case 5: return "TmrSvc";
-        default: return "Unknown";
-    }
-}
-
-void vTaskTraceSwitchedIn(void)
-{
-    if (!g_trace_enabled) return;
-    if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) return;
-    TaskHandle_t h = xTaskGetCurrentTaskHandle();
-    if (h == NULL) return;
-
-    if (g_trace_count < MAX_TRACE_ENTRIES) {
-        uint64_t c = get_system_cycles();
-        uint32_t t = xPortIsInsideInterrupt() ? xTaskGetTickCountFromISR() : xTaskGetTickCount();
-        g_trace_buffer[g_trace_count].tick_ms = t;
-        g_trace_buffer[g_trace_count].cycles  = (uint32_t)c;
-        g_trace_buffer[g_trace_count].task_id = get_task_id(h);
-        g_trace_buffer[g_trace_count].event   = 1; /* IN */
-        g_trace_count++;
-    } else {
-        g_trace_overflow = true;
-    }
-}
-
-void vTaskTraceSwitchedOut(void)
-{
-    if (!g_trace_enabled) return;
-    if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) return;
-    TaskHandle_t h = xTaskGetCurrentTaskHandle();
-    if (h == NULL) return;
-
-    if (g_trace_count < MAX_TRACE_ENTRIES) {
-        uint64_t c = get_system_cycles();
-        uint32_t t = xPortIsInsideInterrupt() ? xTaskGetTickCountFromISR() : xTaskGetTickCount();
-        g_trace_buffer[g_trace_count].tick_ms = t;
-        g_trace_buffer[g_trace_count].cycles  = (uint32_t)c;
-        g_trace_buffer[g_trace_count].task_id = get_task_id(h);
-        g_trace_buffer[g_trace_count].event   = 0; /* OUT */
-        g_trace_count++;
-    } else {
-        g_trace_overflow = true;
-    }
-}
-
-/*----------------------------------------------------------------------------
- * Four-Task Latency and Execution Metric Buffer
- *----------------------------------------------------------------------------*/
-#define MAX_TASK_METRIC_ENTRIES 1024
-
-typedef struct {
-    uint32_t tick_ms;
-    uint32_t latency_cycles;
-    uint32_t exec_cycles;
-    uint8_t  task_id; /* 1=Alarm, 2=Acq, 3=Proc, 4=Log */
-} __attribute__((packed)) TaskMetricEntry_t;
-
-typedef struct {
-    uint32_t count;
-    uint64_t sum_latency_cycles;
-    uint32_t min_latency_cycles;
-    uint32_t max_latency_cycles;
-    uint64_t sum_exec_cycles;
-    uint32_t min_exec_cycles;
-    uint32_t max_exec_cycles;
-} TaskMetricSummary_t;
-
-static TaskMetricEntry_t   g_task_metrics[MAX_TASK_METRIC_ENTRIES];
-static volatile uint32_t   g_task_metric_count = 0;
-static TaskMetricSummary_t g_task_stats[5]     = { { 0 } };
-
-static void record_task_metric(uint8_t task_id, uint32_t tick_ms, uint64_t t_ready, uint64_t t_start, uint64_t t_end)
-{
-    if (task_id < 1 || task_id > 4) return;
-
-    uint32_t lat_cycles  = (t_start >= t_ready) ? (uint32_t)(t_start - t_ready) : 0;
-    uint32_t exec_cycles = (t_end >= t_start)   ? (uint32_t)(t_end - t_start)   : 0;
-
-    UBaseType_t uxSaved = taskENTER_CRITICAL_FROM_ISR();
-    if (g_task_metric_count < MAX_TASK_METRIC_ENTRIES) {
-        g_task_metrics[g_task_metric_count].tick_ms        = tick_ms;
-        g_task_metrics[g_task_metric_count].latency_cycles = lat_cycles;
-        g_task_metrics[g_task_metric_count].exec_cycles    = exec_cycles;
-        g_task_metrics[g_task_metric_count].task_id        = task_id;
-        g_task_metric_count++;
-    }
-
-    TaskMetricSummary_t *s = &g_task_stats[task_id];
-    if (s->count == 0) {
-        s->min_latency_cycles = lat_cycles;
-        s->max_latency_cycles = lat_cycles;
-        s->min_exec_cycles    = exec_cycles;
-        s->max_exec_cycles    = exec_cycles;
-    } else {
-        if (lat_cycles < s->min_latency_cycles) s->min_latency_cycles = lat_cycles;
-        if (lat_cycles > s->max_latency_cycles) s->max_latency_cycles = lat_cycles;
-        if (exec_cycles < s->min_exec_cycles)   s->min_exec_cycles    = exec_cycles;
-        if (exec_cycles > s->max_exec_cycles)   s->max_exec_cycles    = exec_cycles;
-    }
-    s->sum_latency_cycles += lat_cycles;
-    s->sum_exec_cycles    += exec_cycles;
-    s->count++;
-    taskEXIT_CRITICAL_FROM_ISR(uxSaved);
-}
 
 /*----------------------------------------------------------------------------
  * Scenario Pass/Fail Verdict Status Flags (Gated Completion)
@@ -420,8 +247,6 @@ static void vTaskLogging(void *pvParameters);
 static void run_priority_inheritance_demo(void);
 
 static void run_golden_fft_tests(void);
-static void dump_task_trace_buffer(void);
-static void print_task_latency_and_runtime_stats(void);
 static void print_final_benchmark_report(void);
 static void dma_stub_generate_data(int16_t *pBuf, uint32_t block_seq);
 static void rfft_unpack_magnitude(const float32_t *pRfftOut, float32_t *pMag, uint32_t num_bins);
@@ -514,7 +339,6 @@ void Interrupt0_Handler(void)
         g_buf_busy[write_buf] = 1;
         g_buf_overrun[write_buf] = 0;
         dma_stub_generate_data(g_DoubleBuffer[write_buf], g_block_seq_cnt);
-        g_acq_ready_cycle = get_system_cycles();
         xSemaphoreGiveFromISR(xBlockReady, &xHigherPriorityTaskWoken);
     }
 
@@ -531,9 +355,7 @@ void Interrupt0_Handler(void)
 void Interrupt1_Handler(void)
 {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    g_s2_t_mid_fft_irq  = get_system_cycles();
-    g_detect_cycle      = g_s2_t_mid_fft_irq;
-    g_alarm_ready_cycle = g_s2_t_mid_fft_irq;
+    g_s2_irq_seen = g_s2_fft_active;
 
     /* Notify Alarm Task directly from ISR (Priority 5 > Priority 3) */
     xTaskNotifyFromISR(xTaskAlarmHandle, EVENT_HARD_ALARM, eSetValueWithOverwrite, &xHigherPriorityTaskWoken);
@@ -626,63 +448,22 @@ static void rfft_unpack_magnitude(const float32_t *pRfftOut, float32_t *pMag, ui
  * Priority: 5 (Highest)
  * Period  : Aperiodic, Deadline = 10.0 ms, Ci = 1.0 ms
  * Stack   : 1,024 Bytes (256 words, allocated in DTCM)
- * Hardware: Actuates alarm buzzer, emergency warning LED, and trips safety relay.
- * UART    : Authorized to print ONLY its single [EMERGENCY ALARM ACTUATED] line.
+ * Output  : Observable simulated buzzer/LED/relay state, not a physical GPIO.
+ * UART    : No direct operational UART output; logging runs separately.
  * Mutex   : NEVER touches xLogMutex.
  *----------------------------------------------------------------------------*/
 static void vTaskAlarm(void *pvParameters)
 {
     (void)pvParameters;
-    uint32_t notified_code = 0;
-
+    uint32_t notified_code;
     while (1) {
-        /* Wait for direct Task Notification from Processing Task or Preemption ISR */
         if (xTaskNotifyWait(0, ULONG_MAX, &notified_code, portMAX_DELAY) == pdPASS) {
-            uint64_t t_start = get_system_cycles();
-            uint64_t t_ready = (g_alarm_ready_cycle > 0) ? g_alarm_ready_cycle : ((g_detect_cycle > 0) ? g_detect_cycle : t_start);
-            g_alarm_ready_cycle = 0;
-            uint64_t actuate_cycle = t_start;
-            TickType_t actuate_tick = xTaskGetTickCount();
+            g_alarm_output_state = 0x07; /* simulated buzzer, LED and relay outputs */
             STATS_INC(alarm_actuate_count);
-
-            /* Calculate latency in CPU cycles and microseconds */
-            uint32_t latency_cycles = 0;
-            if (actuate_cycle >= g_detect_cycle && g_detect_cycle > 0) {
-                latency_cycles = (uint32_t)(actuate_cycle - g_detect_cycle);
+            if (g_current_scenario == 2 && g_s2_fft_active && g_s2_irq_seen) {
+                g_s2_alarm_during_fft = true;
+                g_test_alarm_count++;
             }
-
-            taskENTER_CRITICAL();
-            g_stats.last_alarm_latency_cycles = latency_cycles;
-            if (latency_cycles > g_stats.max_alarm_latency_cycles) {
-                g_stats.max_alarm_latency_cycles = latency_cycles;
-            }
-            if (g_stats.latency_sample_count == 0 || latency_cycles < g_stats.min_alarm_latency_cycles) {
-                g_stats.min_alarm_latency_cycles = latency_cycles;
-            }
-            g_stats.total_alarm_latency_cycles += latency_cycles;
-            g_stats.latency_sample_count++;
-            taskEXIT_CRITICAL();
-
-            /* Track Scenario 2 mid-FFT preemption actuation */
-            if (g_current_scenario == 2) {
-                g_s2_t_alarm_actuate = actuate_cycle;
-            }
-
-            /* Actuate Emergency Hardware: Buzzer ON, LED ON, Trip Relay */
-            volatile uint32_t dummy_actuator = 0x07;
-            (void)dummy_actuator;
-
-            /* Single authorized direct UART print for hard real-time latency deadline */
-            uart_puts("\r\n>>> [EMERGENCY ALARM ACTUATED] Level=2 | Latency=");
-            uart_print_uint(latency_cycles);
-            uart_puts(" cycles (");
-            uart_print_float((float)latency_cycles / 25.0f, 2);
-            uart_puts(" us) | Tick=");
-            uart_print_uint(actuate_tick);
-            uart_puts(" ms | Actuation: BUZZER_ON + RELAY_TRIP <<<\r\n");
-
-            uint64_t t_end = get_system_cycles();
-            record_task_metric(1, actuate_tick, t_ready, t_start, t_end);
         }
     }
 }
@@ -700,9 +481,6 @@ static void vTaskAcquisition(void *pvParameters)
     while (1) {
         /* Wait for DMA ISR half-buffer completion */
         if (xSemaphoreTake(xBlockReady, portMAX_DELAY) == pdPASS) {
-            uint64_t t_start = get_system_cycles();
-            uint64_t t_ready = (g_acq_ready_cycle > 0) ? g_acq_ready_cycle : t_start;
-            g_acq_ready_cycle = 0;
             uint32_t tick_now = xTaskGetTickCount();
 
             uint8_t read_buf = g_dma_active_buf ^ 1;
@@ -713,7 +491,6 @@ static void vTaskAcquisition(void *pvParameters)
             desc.block_seq      = current_seq;
             desc.timestamp_ms   = tick_now;
             desc.overrun_flag   = g_buf_overrun[read_buf];
-            desc.t_ready_cycles = get_system_cycles(); /* Processing task t_ready */
 
             if (g_current_scenario == 1) {
                 desc.anomaly_type = (current_seq == 6) ? 1 : ((current_seq == 14) ? 2 : 0);
@@ -724,9 +501,13 @@ static void vTaskAcquisition(void *pvParameters)
             }
 
             /* Send block descriptor to Processing Task (depth 2 queue) */
-            xQueueSend(xBlockQueue, &desc, portMAX_DELAY);
+            if (xQueueSend(xBlockQueue, &desc, 0) != pdPASS) {
+                STATS_INC(queue_dropped_blocks);
+                g_buf_busy[read_buf] = 0;
+                g_buf_overrun[read_buf] = 0;
+            }
 
-            /* Emulate acquisition overhead Ci ~ 2.0 ms */
+            /* Fixed synthetic workload; not a calibrated CPU-time budget. */
             for (volatile int i = 0; i < 4000; i++) {
                 __asm__ volatile ("nop");
             }
@@ -738,8 +519,6 @@ static void vTaskAcquisition(void *pvParameters)
                 uart_puts("[Inheritance Demo] Step 4: Acquisition (Pri=4) arrives -> Preempts boosted Logging (4 > 3) [PASS] [ok]\r\n");
             }
 
-            uint64_t t_end = get_system_cycles();
-            record_task_metric(2, tick_now, t_ready, t_start, t_end);
         }
     }
 }
@@ -750,7 +529,7 @@ static void vTaskAcquisition(void *pvParameters)
  * Period  : 64 ms, Deadline = 64 ms, Ci = 12.0 ms
  * Stack   : 4,096 Bytes (1,024 words, allocated in DTCM)
  * Hardware: ARM Cortex-M55 Helium MVE vector math & CMSIS-DSP
- * UART    : NEVER calls UART directly! Telemetry goes to queues.
+ * UART    : Operational telemetry goes to queues; specialized tests print diagnostics.
  *----------------------------------------------------------------------------*/
 static void vTaskProcessing(void *pvParameters)
 {
@@ -760,11 +539,7 @@ static void vTaskProcessing(void *pvParameters)
     while (1) {
         /* Wait for block descriptor from Acquisition Task */
         if (xQueueReceive(xBlockQueue, &desc, portMAX_DELAY) == pdPASS) {
-            uint64_t t_start = get_system_cycles();
-            uint64_t t_ready = (desc.t_ready_cycles > 0) ? desc.t_ready_cycles : t_start;
-            uint32_t tick_now = xTaskGetTickCount();
-
-            /* 1. Helium Vector Conversion: int16 (1.0g = 1000 LSB) -> float32 (g) */
+            /* 1. Input Conversion: int16 (1.0g = 1000 LSB) -> float32 (g) */
             const float32_t scale = 1.0f / 1000.0f;
             for (int i = 0; i < BLOCK_SIZE; i += 4) {
                 g_FFT_Input[i + 0] = (float32_t)desc.pData[i + 0] * scale;
@@ -779,45 +554,24 @@ static void vTaskProcessing(void *pvParameters)
 
             float32_t peak = 0.0f;
             uint32_t peak_idx = 0;
-            arm_max_f32(g_FFT_Input, BLOCK_SIZE, &peak, &peak_idx);
+            for (uint32_t i = 0; i < BLOCK_SIZE; i++) {
+                float32_t a = fabsf(g_FFT_Input[i]);
+                if (a > peak) { peak = a; peak_idx = i; }
+            }
+            (void)peak_idx;
             float32_t cf = (rms > 0.001f) ? (peak / rms) : 1.0f;
 
-            /* 3. Compute 512-Point Real FFT using CMSIS-DSP Helium Vector Engine */
+            /* 3. Compute 512-Point Real FFT using CMSIS-DSP */
             if (g_current_scenario == 2 && !g_s2_preempt_verified) {
                 g_s2_preempt_armed = true;
-                g_s2_t_fft_start   = get_system_cycles();
+                g_s2_fft_active = true;
             }
 
             /* Execute RFFT. If armed, rfft_mid_stage_hook() triggers Interrupt 1 mid-computation */
             arm_rfft_fast_f32(&g_rfft_instance, g_FFT_Input, g_FFT_Output, 0);
 
-            if (g_current_scenario == 2 && !g_s2_preempt_verified && g_s2_t_alarm_actuate > 0) {
-                g_s2_t_fft_end = get_system_cycles();
-                if (g_s2_t_fft_start < g_s2_t_mid_fft_irq &&
-                    g_s2_t_mid_fft_irq <= g_s2_t_alarm_actuate &&
-                    g_s2_t_alarm_actuate <= g_s2_t_fft_end) {
-                    g_s2_preempt_verified = true;
-                    uart_puts("[Preemption] Preemption verified! [PASS] [ok] t_start=");
-                    uart_print_uint((uint32_t)g_s2_t_fft_start);
-                    uart_puts(" < t_irq=");
-                    uart_print_uint((uint32_t)g_s2_t_mid_fft_irq);
-                    uart_puts(" <= t_actuate=");
-                    uart_print_uint((uint32_t)g_s2_t_alarm_actuate);
-                    uart_puts((g_s2_t_alarm_actuate < g_s2_t_fft_end) ? " < t_end=" : " <= t_end=");
-                    uart_print_uint((uint32_t)g_s2_t_fft_end);
-                    uart_puts(" (cycles)\r\n");
-                } else {
-                    uart_puts("[Preemption] Preemption check FAILED: [FAIL] t_start=");
-                    uart_print_uint((uint32_t)g_s2_t_fft_start);
-                    uart_puts(" t_irq=");
-                    uart_print_uint((uint32_t)g_s2_t_mid_fft_irq);
-                    uart_puts(" t_actuate=");
-                    uart_print_uint((uint32_t)g_s2_t_alarm_actuate);
-                    uart_puts(" t_end=");
-                    uart_print_uint((uint32_t)g_s2_t_fft_end);
-                    uart_puts(" (cycles)\r\n");
-                }
-            }
+            bool verify_preemption = g_s2_fft_active;
+            g_s2_fft_active = false;
 
             /* 4. Compute Magnitude Spectrum (Reusing g_FFT_Input buffer in DTCM = 4 KB total) */
             rfft_unpack_magnitude(g_FFT_Output, g_Mag_Spectrum, NUM_MAG_BINS);
@@ -830,13 +584,21 @@ static void vTaskProcessing(void *pvParameters)
             float32_t peak_freq_hz = (float32_t)peak_bin * FFT_BIN_RES_HZ;
 
             /* Feature E: Fault Harmonic Magnitude (Bin 19 = 19 * 15.625 = 296.88 Hz ~ 300 Hz) */
-            float32_t fault_harmonic_mag = g_Mag_Spectrum[19];
+            float32_t fault_harmonic_mag = 2.0f * g_Mag_Spectrum[19] / (float32_t)BLOCK_SIZE; /* g, one-sided amplitude */
 
             /* Feature F: Sub-band Energy (Fault Band: 200 Hz - 600 Hz, Bins 13..38) */
             float32_t band_energy = 0.0f;
             arm_power_f32(&g_Mag_Spectrum[13], 26, &band_energy);
 
-            /* Emulate processing execution budget (Ci = 12.0 ms) */
+            if (verify_preemption) {
+                g_s2_preempt_verified = g_s2_irq_seen && g_s2_alarm_during_fft &&
+                    peak_bin == 6 && fabsf(rms - 0.7071f) < 0.01f;
+                uart_puts(g_s2_preempt_verified ?
+                    "[PREEMPTION] IRQ -> Alarm while FFT active -> FFT resumed; RMS/bin valid [PASS] [ok]\r\n" :
+                    "[PREEMPTION] order or FFT result invalid [FAIL]\r\n");
+            }
+
+            /* Stress uses a blocked delay, not extra CPU execution time. */
             if (g_current_scenario == 3) {
                 vTaskDelay(pdMS_TO_TICKS(6));
             } else {
@@ -871,8 +633,6 @@ static void vTaskProcessing(void *pvParameters)
 
             /* 6. Actuate Alarm Task immediately via Task Notification if Critical */
             if (alarm_level == 2) {
-                g_detect_cycle = get_system_cycles();
-                g_alarm_ready_cycle = g_detect_cycle;
                 xTaskNotify(xTaskAlarmHandle, event_code, eSetValueWithOverwrite);
             }
 
@@ -888,7 +648,7 @@ static void vTaskProcessing(void *pvParameters)
             entry.peak_freq_hz = peak_freq_hz;
             entry.peak_bin     = peak_bin;
             entry.alarm_level  = alarm_level;
-            entry.flags        = desc.overrun_flag;
+            entry.flags        = (uint8_t)(desc.overrun_flag | (g_current_scenario << 4));
 
             if (alarm_level > 0) {
                 /* Critical / Warning alarms routed to dedicated xAlarmLogQueue (FIFO, depth 8).
@@ -909,9 +669,12 @@ static void vTaskProcessing(void *pvParameters)
                         /* Queue full: drop oldest record to make room */
                         LogEntry_t old_entry;
                         if (xQueueReceive(xLogQueue, &old_entry, 0) == pdPASS) {
+                            g_stats.normal_logs_dropped++;
+                            g_phase_stats[old_entry.flags >> 4].normal_logs_dropped++;
+                        }
+                        if (xQueueSend(xLogQueue, &entry, 0) != pdPASS) {
                             STATS_INC(normal_logs_dropped);
                         }
-                        xQueueSend(xLogQueue, &entry, 0);
                     }
                 }
             }
@@ -921,7 +684,6 @@ static void vTaskProcessing(void *pvParameters)
             if (g_current_scenario == 2 && g_s2_preempt_verified && !g_s2_inherit_triggered) {
                 g_s2_inherit_triggered = true;
                 /* Signal vTaskLogging to initiate priority inheritance sequence */
-                g_log_notify_ready_cycle = get_system_cycles();
                 xTaskNotifyGive(xTaskLogHandle);
 
                 /* Wait until Logging takes xLogMutex and signals xInheritSignalSem */
@@ -938,8 +700,6 @@ static void vTaskProcessing(void *pvParameters)
                 }
             }
 
-            uint64_t t_end = get_system_cycles();
-            record_task_metric(3, tick_now, t_ready, t_start, t_end);
         }
     }
 }
@@ -958,17 +718,7 @@ static void vTaskLogging(void *pvParameters)
 
     while (1) {
         /* Wait for 1000 ms periodic telemetry or direct notification */
-        uint32_t notify_val = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
-        uint64_t t_start = get_system_cycles();
-        uint64_t t_ready;
-        if (notify_val > 0) {
-            t_ready = (g_log_notify_ready_cycle > 0) ? g_log_notify_ready_cycle : t_start;
-            g_log_notify_ready_cycle = 0;
-        } else {
-            t_ready = (g_log_next_periodic_ready_cycle > 0 && t_start >= g_log_next_periodic_ready_cycle)
-                      ? g_log_next_periodic_ready_cycle : t_start;
-        }
-        uint32_t tick_now = xTaskGetTickCount();
+        (void)ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
 
         if (!g_experiment_running) {
             continue;
@@ -992,7 +742,6 @@ static void vTaskLogging(void *pvParameters)
 
             /* 1. First drain priority alarm entries */
             while (xQueueReceive(xAlarmLogQueue, &entry, 0) == pdPASS) {
-                STATS_INC(alarm_logs_written);
                 uart_puts("  [ALARM ENTRY #");
                 uart_print_uint(entry.block_seq);
                 uart_puts("] T=");
@@ -1009,12 +758,13 @@ static void vTaskLogging(void *pvParameters)
                 uart_print_uint(entry.peak_bin);
                 uart_puts(") | Level=");
                 uart_print_uint(entry.alarm_level);
-                uart_puts(" [CRITICAL_ALARM]\r\n");
+                uart_puts(" [ALARM_EVENT]\r\n");
+                g_stats.alarm_logs_written++;
+                g_phase_stats[entry.flags >> 4].alarm_logs_written++;
             }
 
             /* 2. Then drain routine normal telemetry */
             while (xQueueReceive(xLogQueue, &entry, 0) == pdPASS) {
-                STATS_INC(normal_logs_written);
                 uart_puts("  [ENTRY #");
                 uart_print_uint(entry.block_seq);
                 uart_puts("] T=");
@@ -1031,7 +781,9 @@ static void vTaskLogging(void *pvParameters)
                 uart_print_uint(entry.peak_bin);
                 uart_puts(") | Level=");
                 uart_print_uint(entry.alarm_level);
-                uart_puts(" [NORMAL_SPARSE]\r\n");
+                uart_puts(" [NORMAL_LOG]\r\n");
+                g_stats.normal_logs_written++;
+                g_phase_stats[entry.flags >> 4].normal_logs_written++;
             }
 
             /* Summary status line */
@@ -1056,9 +808,6 @@ static void vTaskLogging(void *pvParameters)
             xSemaphoreGive(xLogMutex);
         }
 
-        uint64_t t_end = get_system_cycles();
-        record_task_metric(4, tick_now, t_ready, t_start, t_end);
-        g_log_next_periodic_ready_cycle = t_end + (uint64_t)1000 * SYSTICK_RELOAD_CYCLES;
     }
 }
 
@@ -1195,6 +944,10 @@ static void vScenarioTimerCallback(TimerHandle_t xTimer)
         /* Accelerate DMA timer from 64 ms to 4 ms burst rate */
         xTimerChangePeriod(xDmaTimer, pdMS_TO_TICKS(4), 0);
     }
+    else if (g_current_scenario == 2 && s_timer_ticks >= 3000) {
+        uart_puts("[FAIL] Scenario 2 timeout\r\n");
+        qemu_exit(1);
+    }
     /* Complete Scenario 3 at ~3400 ms */
     else if (g_current_scenario == 3 && s_timer_ticks >= 3400) {
         static uint8_t s_drain_stage = 0;
@@ -1211,26 +964,26 @@ static void vScenarioTimerCallback(TimerHandle_t xTimer)
                 return;
             }
             /* Flush logging queues */
-            g_log_notify_ready_cycle = get_system_cycles();
             xTaskNotifyGive(xTaskLogHandle);
             s_drain_stage = 2;
             return;
         }
 
-        /* Stage 3: Drain any remaining logs so written (drained) + dropped == generated */
-        LogEntry_t discarded;
-        while (xQueueReceive(xAlarmLogQueue, &discarded, 0) == pdPASS) {
-            STATS_INC(alarm_logs_written);
-        }
-        while (xQueueReceive(xLogQueue, &discarded, 0) == pdPASS) {
-            STATS_INC(normal_logs_written);
+        /* Logger alone drains UART records; no discard is counted as written. */
+        if (uxQueueMessagesWaiting(xAlarmLogQueue) || uxQueueMessagesWaiting(xLogQueue)) {
+            xTaskNotifyGive(xTaskLogHandle);
+            return;
         }
 
         /* Gate Scenario 3 PASS/FAIL */
         bool s3_pass = (g_stats.isr_overrun_count > 0) &&
                        (g_stats.normal_logs_dropped > 0) &&
                        (g_stats.alarm_logs_dropped == 0) &&
-                       (g_stats.generated_blocks == (g_stats.processed_blocks + g_stats.isr_overrun_count));
+                       (g_stats.generated_blocks == g_stats.processed_blocks + g_stats.isr_overrun_count + g_stats.queue_dropped_blocks) &&
+                       (g_stats.normal_logs_generated == g_stats.normal_logs_written + g_stats.normal_logs_dropped) &&
+                       (g_stats.alarm_logs_generated == g_stats.alarm_logs_written + g_stats.alarm_logs_dropped) &&
+                       !g_buf_busy[0] && !g_buf_busy[1] &&
+                       uxQueueMessagesWaiting(xBlockQueue) == 0;
         g_s3_passed = s3_pass;
 
         if (s3_pass) {
@@ -1243,8 +996,6 @@ static void vScenarioTimerCallback(TimerHandle_t xTimer)
         g_experiment_running = false;
         xTimerStop(xScenarioTimer, 0);
 
-        dump_task_trace_buffer();
-        print_task_latency_and_runtime_stats();
         print_final_benchmark_report();
 
         /* Gate final simulation exit: ALL 3 SCENARIOS + STACK BUDGET MUST PASS */
@@ -1359,7 +1110,7 @@ static void run_golden_fft_tests(void)
     uart_print_float(bin3_mag, 2);
     uart_puts(", Other_max = ");
     uart_print_float(other_max, 2);
-    if (fabsf(bin3_mag - 768.0f) < 1.0f && other_max < 0.5f) {
+    if (fabsf(bin3_mag - 768.0f) < 1.0f && other_max < 0.5f && fabsf(2.0f * bin3_mag / BLOCK_SIZE - 3.0f) < 0.01f) {
         test4_pass = true;
         uart_puts(" -> [PASS] [ok]\r\n");
     } else {
@@ -1379,345 +1130,42 @@ static void run_golden_fft_tests(void)
 }
 
 /*----------------------------------------------------------------------------
- * Sub-Microsecond RAM Trace Dump Function
- *----------------------------------------------------------------------------*/
-static void dump_task_trace_buffer(void)
-{
-    g_trace_enabled = false;
-    uart_puts("\r\n====================================================================\r\n");
-    uart_puts(">>> TASK SWITCH EXECUTION TRACE DUMP (MEASURED IN RAM)\r\n");
-    uart_puts("====================================================================\r\n");
-    for (uint32_t i = 0; i < g_trace_count; i++) {
-        uart_puts("[TRACE] tick=");
-        uart_print_uint(g_trace_buffer[i].tick_ms);
-        uart_puts(" cycles=");
-        uart_print_uint(g_trace_buffer[i].cycles);
-        uart_puts(" task=");
-        uart_puts(get_task_name_by_id(g_trace_buffer[i].task_id));
-        uart_puts(" event=");
-        uart_puts(g_trace_buffer[i].event ? "IN" : "OUT");
-        uart_puts("\r\n");
-    }
-    if (g_trace_overflow) {
-        uart_puts("[TRACE_WARNING] Buffer reached capacity, some events truncated\r\n");
-    }
-    uart_puts(">>> END TASK SWITCH TRACE DUMP (Total: ");
-    uart_print_uint(g_trace_count);
-    uart_puts(" events)\r\n");
-}
-
-/*----------------------------------------------------------------------------
- * Four-Task Latency, Runtime Statistics & Measured RTA Table Output
- *----------------------------------------------------------------------------*/
-static void print_task_latency_and_runtime_stats(void)
-{
-    /* 1. Print all individual task metrics */
-    uart_puts("\r\n====================================================================\r\n");
-    uart_puts(">>> FOUR-TASK MEASURED LATENCY & EXECUTION METRICS (INDIVIDUAL RECORDS)\r\n");
-    uart_puts("====================================================================\r\n");
-    for (uint32_t i = 0; i < g_task_metric_count; i++) {
-        uart_puts("[TASK_METRIC] tick=");
-        uart_print_uint(g_task_metrics[i].tick_ms);
-        uart_puts(" task=");
-        uart_puts(get_task_name_by_id(g_task_metrics[i].task_id));
-        uart_puts(" latency_cycles=");
-        uart_print_uint(g_task_metrics[i].latency_cycles);
-        uart_puts(" exec_cycles=");
-        uart_print_uint(g_task_metrics[i].exec_cycles);
-        uart_puts("\r\n");
-    }
-    uart_puts(">>> END TASK METRIC RECORDS (Total: ");
-    uart_print_uint(g_task_metric_count);
-    uart_puts(" records)\r\n");
-
-    /* 2. Print 4-Task Latency & Execution Summary Table */
-    uart_puts("\r\n====================================================================\r\n");
-    uart_puts(">>> FOUR-TASK RESPONSE LATENCY & EXECUTION TIME SUMMARY (TABLE)\r\n");
-    uart_puts("====================================================================\r\n");
-    uart_puts("Task Name        | Prio | Samples | Max Lat (us) | Mean Lat (us) | Max Exec (us) | Mean Exec (us) | Deadline (us) | Status\r\n");
-    uart_puts("-----------------|------|---------|--------------|---------------|---------------|----------------|---------------|--------\r\n");
-
-    const char *names[4] = { "vTaskAlarm      ", "vTaskAcquisition", "vTaskProcessing ", "vTaskLogging    " };
-    uint8_t  prios[4]    = { 5, 4, 3, 2 };
-    uint32_t d_us[4]     = { 10000, 64000, 64000, 1000000 };
-
-    float max_c_ms[4]  = { 0.0f, 0.0f, 0.0f, 0.0f };
-
-    for (int idx = 0; idx < 4; idx++) {
-        uint8_t tid = idx + 1;
-        TaskMetricSummary_t *s = &g_task_stats[tid];
-        uint32_t count = s->count;
-        float max_lat_u  = (float)s->max_latency_cycles / 25.0f;
-        float mean_lat_u = (count > 0) ? ((float)s->sum_latency_cycles / (float)count) / 25.0f : 0.0f;
-        float max_ex_u   = (float)s->max_exec_cycles / 25.0f;
-        float mean_ex_u  = (count > 0) ? ((float)s->sum_exec_cycles / (float)count) / 25.0f : 0.0f;
-
-        max_c_ms[idx]  = (float)((uint32_t)max_ex_u) / 1000.0f;
-
-        bool ok = (max_lat_u + max_ex_u <= (float)d_us[idx]);
-
-        uart_puts(names[idx]);
-        uart_puts(" |  ");
-        uart_print_uint(prios[idx]);
-        uart_puts("   |  ");
-        uart_print_uint(count);
-        uart_puts("    |  ");
-        uart_print_float(max_lat_u, 2);
-        uart_puts("      |  ");
-        uart_print_float(mean_lat_u, 2);
-        uart_puts("       |  ");
-        uart_print_float(max_ex_u, 2);
-        uart_puts("      |  ");
-        uart_print_float(mean_ex_u, 2);
-        uart_puts("       |  ");
-        uart_print_uint(d_us[idx]);
-        uart_puts("       | ");
-        uart_puts(ok ? "[PASS] [ok]\r\n" : "[FAIL]\r\n");
-    }
-    uart_puts("------------------------------------------------------------------------------------------------------------------------\r\n");
-
-    /* 3. FreeRTOS Runtime Statistics & Task List */
-    uart_puts("\r\n====================================================================\r\n");
-    uart_puts(">>> FREERTOS RUN-TIME TASK STATISTICS (vTaskGetRunTimeStats)\r\n");
-    uart_puts("====================================================================\r\n");
-    static char stats_buffer[1024];
-    vTaskGetRunTimeStatistics(stats_buffer, sizeof(stats_buffer));
-    uart_puts("Task Name       Run Time Counter   Percentage (%)\r\n");
-    uart_puts("--------------------------------------------------\r\n");
-    uart_puts(stats_buffer);
-    uart_puts("\r\n");
-
-    uart_puts("====================================================================\r\n");
-    uart_puts(">>> FREERTOS TASK LIST & SYSTEM STATE (vTaskList)\r\n");
-    uart_puts("====================================================================\r\n");
-    vTaskListTasks(stats_buffer, sizeof(stats_buffer));
-    uart_puts("Task Name       State   Prio    StackFree  TaskNum\r\n");
-    uart_puts("--------------------------------------------------\r\n");
-    uart_puts(stats_buffer);
-    uart_puts("\r\n");
-
-    /* 4. Real Measured Response Time Analysis (RTA) Table (§3.3.3 / §4.2.3 / §4.4.4) */
-    uart_puts("====================================================================================================\r\n");
-    uart_puts(">>> RESPONSE TIME ANALYSIS (RTA) COMPARISON: DESIGN VS MEASURED (§3.3.3)\r\n");
-    uart_puts("====================================================================================================\r\n");
-    uart_puts("Task Name        | Prio | Design Ci | Meas Max Ci | Design RTA | Meas RTA   | Deadline  | Slack Margin | Status\r\n");
-    uart_puts("-----------------|------|-----------|-------------|------------|------------|-----------|--------------|--------\r\n");
-
-    /* Recalculate RTA from measured worst-case execution times (§3.3.3) */
-    float rta_meas[4];
-    /* Alarm (Task 1): R_1 = C_1 */
-    rta_meas[0] = max_c_ms[0];
-    /* Acquisition (Task 2): R_2 = C_2 + I_1 (Interference from Alarm) */
-    rta_meas[1] = max_c_ms[1] + max_c_ms[0];
-    /* Processing (Task 3): R_3 = C_3 + I_1 + I_2 + B_3 (B_3 <= 0.100 ms blocking margin) */
-    rta_meas[2] = max_c_ms[2] + max_c_ms[1] + max_c_ms[0] + 0.100f;
-    /* Logging (Task 4): R_4 = C_4 + I_1 + I_2 + I_3 + B_4 (B_4 = 0 ms, lowest priority) */
-    rta_meas[3] = max_c_ms[3] + max_c_ms[1] + max_c_ms[2] + max_c_ms[0];
-
-    const char *des_ci[4]  = { "1.00 ms ", "2.00 ms ", "12.00 ms", "20.00 ms" };
-    const char *des_rta[4] = { "<=1.0 ms", "2.00 ms ", "15.00 ms", "35.00 ms" };
-    const char *d_str[4]   = { "10.00 ms", "64.00 ms", "64.00 ms", "1000.0ms" };
-    float d_ms[4]          = { 10.0f, 64.0f, 64.0f, 1000.0f };
-
-    for (int idx = 0; idx < 4; idx++) {
-        float slack = d_ms[idx] - rta_meas[idx];
-        bool rta_ok = (rta_meas[idx] <= d_ms[idx]);
-
-        uart_puts(names[idx]);
-        uart_puts(" |  ");
-        uart_print_uint(prios[idx]);
-        uart_puts("   | ");
-        uart_puts(des_ci[idx]);
-        uart_puts("  |   ");
-        uart_print_float(max_c_ms[idx], 3);
-        uart_puts(" ms |  ");
-        uart_puts(des_rta[idx]);
-        uart_puts("  |   ");
-        uart_print_float(rta_meas[idx], 3);
-        uart_puts(" ms | ");
-        uart_puts(d_str[idx]);
-        uart_puts("  |   ");
-        uart_print_float(slack, 3);
-        uart_puts(" ms | ");
-        uart_puts(rta_ok ? "[PASS] [ok]\r\n" : "[FAIL]\r\n");
-    }
-    uart_puts("----------------------------------------------------------------------------------------------------\r\n");
-    uart_puts("* Ghi chu: So lieu do bang SysTick tren QEMU MPS3 AN547 (25 MHz). Toan bo 4 tac vu deu thoa man RTA.\r\n");
-    uart_puts("  Gia thiet RTA: B_3 <= 0.100 ms (gioi han doan toi han sao chep 32 byte), B_4 = 0 ms (vTaskLogging uu tien thap nhat).\r\n");
-    uart_puts("====================================================================================================\r\n");
-}
-
-/*----------------------------------------------------------------------------
  * Final Academic Benchmark & Verification Report
  *----------------------------------------------------------------------------*/
 static void print_final_benchmark_report(void)
 {
-    uart_puts("\r\n====================================================================\r\n");
-    uart_puts("       TONG KET SO LIEU THUC NGHIEM TOAN DIEN (CHUONG IV - V2)     \r\n");
-    uart_puts("====================================================================\r\n");
-
-    /* [1] Data Block Statistics */
-    uart_puts("[1] THONG KE KHOI DU LIEU VA LOG (DANG THUC TOAN HOC):\r\n");
-    uart_puts("    - Tong so khoi sinh ra (Generated)   : ");
-    uart_print_uint(g_stats.generated_blocks);
-    uart_puts("\r\n    - Tong so khoi da xu ly (Processed)  : ");
-    uart_print_uint(g_stats.processed_blocks);
-    uart_puts("\r\n    - So lan tran bo dem DMA (Overrun)   : ");
-    uart_print_uint(g_stats.isr_overrun_count);
-    uart_puts("\r\n    * Kiem tra dang thuc khoi: Generated == Processed + Overrun\r\n");
-    uart_puts("      (");
-    uart_print_uint(g_stats.generated_blocks);
-    uart_puts(" == ");
-    uart_print_uint(g_stats.processed_blocks + g_stats.isr_overrun_count);
-    uart_puts(") -> ");
-    if (g_stats.generated_blocks == (g_stats.processed_blocks + g_stats.isr_overrun_count)) {
-        uart_puts("DANG THUC DUNG [PASS] [ok]\r\n");
-    } else {
-        uart_puts("DANG THUC SAI [FAIL]\r\n");
+    uart_puts("\r\n[RESULTS] Functional run; no CPU%, WCET, RTA or microsecond latency claims\r\n");
+    for (uint32_t i = 0; i <= 3; i++) {
+        SystemStats_t *v = i ? &g_phase_stats[i] : &g_stats;
+        uart_puts("[COUNTS] scenario="); uart_print_uint(i);
+        #define OUT_COUNT(name) uart_puts(" " #name "="); uart_print_uint(v->name)
+        OUT_COUNT(generated_blocks); OUT_COUNT(processed_blocks);
+        OUT_COUNT(isr_overrun_count); OUT_COUNT(queue_dropped_blocks);
+        OUT_COUNT(alarm_actuate_count);
+        OUT_COUNT(normal_logs_generated); OUT_COUNT(normal_logs_written); OUT_COUNT(normal_logs_dropped);
+        OUT_COUNT(alarm_logs_generated); OUT_COUNT(alarm_logs_written); OUT_COUNT(alarm_logs_dropped);
+        #undef OUT_COUNT
+        uart_puts("\r\n");
     }
-
-    uart_puts("\r\n[2] PHAN TACH HANG DOI LOG THUONG VA LOG CANH BAO:\r\n");
-    uart_puts("    - Log thuong sinh ra (Normal Gen)    : ");
-    uart_print_uint(g_stats.normal_logs_generated);
-    uart_puts("\r\n    - Log thuong da ghi (Normal Written) : ");
-    uart_print_uint(g_stats.normal_logs_written);
-    uart_puts(" (Bao gom ban ghi xa o giai doan drain)\r\n");
-    uart_puts("    - Log thuong bi drop (Normal Drop)   : ");
-    uart_print_uint(g_stats.normal_logs_dropped);
-    uart_puts(" (Chinh sach Drop-Oldest tren xLogQueue)\r\n");
-    uart_puts("    * Kiem tra dang thuc log thuong: Generated == Written + Dropped\r\n");
-    uart_puts("      (");
-    uart_print_uint(g_stats.normal_logs_generated);
-    uart_puts(" == ");
-    uart_print_uint(g_stats.normal_logs_written + g_stats.normal_logs_dropped);
-    uart_puts(") -> ");
-    if (g_stats.normal_logs_generated == (g_stats.normal_logs_written + g_stats.normal_logs_dropped)) {
-        uart_puts("DANG THUC DUNG [PASS] [ok]\r\n");
-    } else {
-        uart_puts("DANG THUC SAI [FAIL]\r\n");
+    uart_puts("[ALARM_STATE] output="); uart_print_uint(g_alarm_output_state);
+    uart_puts(" test_events="); uart_print_uint(g_test_alarm_count); uart_puts("\r\n");
+    uart_puts("[HEAP] total=65536 free="); uart_print_uint(xPortGetFreeHeapSize());
+    uart_puts(" minimum_free="); uart_print_uint(xPortGetMinimumEverFreeHeapSize()); uart_puts("\r\n");
+    TaskHandle_t hs[6] = { xTaskAlarmHandle, xTaskAcqHandle, xTaskProcHandle, xTaskLogHandle,
+                          xTaskGetIdleTaskHandle(), (TaskHandle_t)&xTimerTCB };
+    const char *ns[6] = { "Alarm", "Acquisition", "Processing", "Logging", "Idle", "TmrSvc" };
+    uint32_t words[6] = { 256, 256, 1024, 512, configMINIMAL_STACK_SIZE, configTIMER_TASK_STACK_DEPTH };
+    g_hwm_passed = true;
+    for (uint32_t i = 0; i < 6; i++) {
+        uint32_t free_bytes = uxTaskGetStackHighWaterMark(hs[i]) * sizeof(StackType_t);
+        uint32_t alloc = words[i] * sizeof(StackType_t);
+        if (!free_bytes || free_bytes > alloc) g_hwm_passed = false;
+        uart_puts("[STACK] task="); uart_puts(ns[i]);
+        uart_puts(" alloc="); uart_print_uint(alloc);
+        uart_puts(" free="); uart_print_uint(free_bytes);
+        uart_puts(" used="); uart_print_uint(alloc - free_bytes); uart_puts("\r\n");
     }
-    uart_puts("    - Log canh bao sinh (Alarm Gen)      : ");
-    uart_print_uint(g_stats.alarm_logs_generated);
-    uart_puts("\r\n    - Log canh bao da ghi (Alarm Written): ");
-    uart_print_uint(g_stats.alarm_logs_written);
-    uart_puts("\r\n    - Log canh bao bi drop (Alarm Drop)  : ");
-    uart_print_uint(g_stats.alarm_logs_dropped);
-    uart_puts(" -> ");
-    if (g_stats.alarm_logs_dropped == 0) {
-        uart_puts("0 BAN GHI CANH BAO MAT TRONG LAN CHAY NAY (3 canh bao / queue sau 8, xa moi 1000 ms) [PASS] [ok]\r\n");
-    } else {
-        uart_puts("BI MAT CANH BAO [FAIL]\r\n");
-    }
-
-    /* [3] Latency with Cycle & Microsecond Precision */
-    uint32_t mean_lat_cyc = (g_stats.latency_sample_count > 0) ?
-                            (uint32_t)(g_stats.total_alarm_latency_cycles / g_stats.latency_sample_count) : 0;
-    float max_lat_us  = (float)g_stats.max_alarm_latency_cycles / 25.0f;
-    float mean_lat_us = (g_stats.latency_sample_count > 0) ?
-                        ((float)g_stats.total_alarm_latency_cycles / (float)g_stats.latency_sample_count) / 25.0f : 0.0f;
-
-    uart_puts("\r\n[3] DO TRE PHAT HIEN -> BAO DONG (DO CHU KY SYSTICK):\r\n");
-    uart_puts("    - Do tre cuc dai (Max Latency)       : ");
-    uart_print_uint(g_stats.max_alarm_latency_cycles);
-    uart_puts(" cycles (");
-    uart_print_float(max_lat_us, 2);
-    uart_puts(" us)\r\n    - Do tre trung binh (Mean Latency)   : ");
-    uart_print_uint(mean_lat_cyc);
-    uart_puts(" cycles (");
-    uart_print_float(mean_lat_us, 2);
-    uart_puts(" us)\r\n");
-    uart_puts("    * Ghi chu hoc thuat: So lieu do bang SysTick tren QEMU MPS3 AN547 (25 MHz).\r\n");
-    uart_puts("      Khong phai so do dao dong ky tren phan cung that STM32N6.\r\n");
-
-    /* [4] FreeRTOS Heap */
-    uart_puts("\r\n[4] THONG KE FREERTOS HEAP (heap_5.c - SRAM 64 KB):\r\n");
-    uart_puts("    - Tong dung luong Heap cau hinh      : 65536 Bytes (64 KB)\r\n");
-    uart_puts("    - Heap con trong hien tai (Free)     : ");
-    uart_print_uint(xPortGetFreeHeapSize());
-    uart_puts(" Bytes\r\n    - Heap da cap phat thuc te (Used)    : ");
-    uart_print_uint(65536 - xPortGetFreeHeapSize());
-    uart_puts(" Bytes\r\n");
-
-    /* [5] Stack High Water Mark */
-    UBaseType_t hwm_alarm   = uxTaskGetStackHighWaterMark(xTaskAlarmHandle);
-    UBaseType_t hwm_acq     = uxTaskGetStackHighWaterMark(xTaskAcqHandle);
-    UBaseType_t hwm_proc    = uxTaskGetStackHighWaterMark(xTaskProcHandle);
-    UBaseType_t hwm_log     = uxTaskGetStackHighWaterMark(xTaskLogHandle);
-    TaskHandle_t xIdleHandle = xTaskGetIdleTaskHandle();
-    UBaseType_t hwm_idle    = (xIdleHandle != NULL) ? uxTaskGetStackHighWaterMark(xIdleHandle) : 0;
-
-    uint32_t used_alarm = (uint32_t)((256 - hwm_alarm) * sizeof(StackType_t));
-    uint32_t used_acq   = (uint32_t)((256 - hwm_acq) * sizeof(StackType_t));
-    uint32_t used_proc  = (uint32_t)((1024 - hwm_proc) * sizeof(StackType_t));
-    uint32_t used_log   = (uint32_t)((512 - hwm_log) * sizeof(StackType_t));
-    uint32_t used_idle  = (uint32_t)((configMINIMAL_STACK_SIZE - hwm_idle) * sizeof(StackType_t));
-
-    bool hwm_ok = (used_alarm < 1024) &&
-                  (used_acq < 1024) &&
-                  (used_proc < 4096) &&
-                  (used_log < 2048) &&
-                  (used_idle < 512);
-    g_hwm_passed = hwm_ok;
-
-    uart_puts("\r\n[5] BANG THEO DOI NGAN XEP (STACK HWM SO VOI BANG 3.1 CHUONG III):\r\n");
-    uart_puts("--------------------------------------------------------------------------------\r\n");
-    uart_puts("Task Name        | Prio | Memory | Alloc (Bytes) | Free HWM (Bytes) | Used (Bytes)\r\n");
-    uart_puts("--------------------------------------------------------------------------------\r\n");
-
-    /* vTaskAlarm */
-    uart_puts("vTaskAlarm       |  5   |  DTCM  |  1024 (256w)  |  ");
-    uart_print_uint((uint32_t)(hwm_alarm * sizeof(StackType_t)));
-    uart_puts(" Bytes       |  ");
-    uart_print_uint(used_alarm);
-    uart_puts(" Bytes\r\n");
-
-    /* vTaskAcquisition */
-    uart_puts("vTaskAcquisition |  4   |  DTCM  |  1024 (256w)  |  ");
-    uart_print_uint((uint32_t)(hwm_acq * sizeof(StackType_t)));
-    uart_puts(" Bytes       |  ");
-    uart_print_uint(used_acq);
-    uart_puts(" Bytes\r\n");
-
-    /* vTaskProcessing */
-    uart_puts("vTaskProcessing  |  3   |  DTCM  |  4096 (1024w) |  ");
-    uart_print_uint((uint32_t)(hwm_proc * sizeof(StackType_t)));
-    uart_puts(" Bytes       |  ");
-    uart_print_uint(used_proc);
-    uart_puts(" Bytes\r\n");
-
-    /* vTaskLogging */
-    uart_puts("vTaskLogging     |  2   |  SRAM  |  2048 (512w)  |  ");
-    uart_print_uint((uint32_t)(hwm_log * sizeof(StackType_t)));
-    uart_puts(" Bytes       |  ");
-    uart_print_uint(used_log);
-    uart_puts(" Bytes\r\n");
-
-    /* Idle Task */
-    uart_puts("Idle Task        |  0   |  SRAM  |   512 (128w)  |  ");
-    uart_print_uint((uint32_t)(hwm_idle * sizeof(StackType_t)));
-    uart_puts(" Bytes       |  ");
-    uart_print_uint(used_idle);
-    uart_puts(" Bytes\r\n");
-    uart_puts("--------------------------------------------------------------------------------\r\n");
-    uart_puts("Ngan sach ly thuyet vTaskProcessing (Paper Budget): ~616 Bytes\r\n");
-    uart_puts("  (Context: 212 B + Locals: 120 B + FFT Call: 96 B + Unpack: 64 B + API: 80 B + Margin: 44 B)\r\n");
-    float proc_safety_factor = (used_proc > 0) ? (4096.0f / (float)used_proc) : 0.0f;
-    float proc_percent = (float)used_proc * 100.0f / 4096.0f;
-    uart_puts("  -> So voi cap phat 4096 B: He so an toan ");
-    uart_print_float(proc_safety_factor, 1);
-    uart_puts("x (Thuc te HWM su dung: ");
-    uart_print_uint(used_proc);
-    uart_puts(" Bytes / ");
-    uart_print_float(proc_percent, 1);
-    uart_puts("%)\r\n");
-    uart_puts("--------------------------------------------------------------------------------\r\n");
-    uart_puts("Ghi chu: Free HWM la so byte ngan xep toi thieu con du chua tung bi cham toi.\r\n");
-    if (hwm_ok) {
-        uart_puts("Ket luan: [PASS] [ok] Moi Task deu thoa man: Used < Alloc (Khong vuot ngan sach).\r\n");
-    } else {
-        uart_puts("Ket luan: [FAIL] Phat hien Task vuot ngan sach stack!\r\n");
-    }
-    uart_puts("====================================================================\r\n");
+    uart_puts(g_hwm_passed ? "[STACK_CHECK] [PASS] [ok]\r\n" : "[STACK_CHECK] [FAIL]\r\n");
 }
 
 /*----------------------------------------------------------------------------
@@ -1840,7 +1288,7 @@ int main(void)
     uart_puts("[Kernel] Starting FreeRTOS Scheduler with 4 Tasks + Idle (Tick = 1000 Hz)...\r\n");
     uart_puts("\r\n====================================================================\r\n");
     uart_puts(">>> BAT DAU KICH BAN 1: HOAT DONG BINH THUONG VA PHAT HIEN ANOMALY <<<\r\n");
-    uart_puts("    (20 khoi @ 8 kHz, 64 ms/khoi. Chen loi tai Khoi #6 va #14)\r\n");
+    uart_puts("    (Cua so 2000 ms; 8 kHz logic, 64 ms/khoi. Chen loi tai Khoi #6 va #14)\r\n");
     uart_puts("====================================================================\r\n");
 
     /* 8. Start the Scheduler */

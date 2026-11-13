@@ -1,0 +1,26 @@
+build/firmware.elf  :
+section              size        addr
+.text              145972           0
+.ARM.exidx              8      145972
+.copy.table            24      145980
+.zero.table            16      146004
+.dtcm_data              0   536870912
+.dtcm_bss           12672   536870912
+.data               43740   553648128
+.bss                70872   553691872
+.heap               16384   553762744
+.stack               8192   557834240
+.ARM.attributes        58           0
+.comment               57           0
+.debug_info         98184           0
+.debug_abbrev       13198           0
+.debug_loclists     47621           0
+.debug_aranges       2304           0
+.debug_rnglists      6023           0
+.debug_macro        66897           0
+.debug_line         70720           0
+.debug_str         849116           0
+.debug_frame         7812           0
+Total             1459870
+
+

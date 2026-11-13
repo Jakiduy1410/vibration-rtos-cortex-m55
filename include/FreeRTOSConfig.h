@@ -18,7 +18,7 @@
 #define configUSE_PREEMPTION                    1
 #define configUSE_PORT_OPTIMISED_TASK_SELECTION 1
 #define configUSE_TICKLESS_IDLE                 1
-#define configCPU_CLOCK_HZ                      ( 25000000UL )
+#define configCPU_CLOCK_HZ                      ( 32000000UL )
 #define configTICK_RATE_HZ                      ( ( TickType_t ) 1000 )
 #define configMAX_PRIORITIES                    ( 6 )
 #define configMINIMAL_STACK_SIZE                ( ( uint16_t ) 128 ) /* 128 words = 512 Bytes for Idle Task */
@@ -51,20 +51,12 @@
 #define configUSE_DAEMON_TASK_STARTUP_HOOK      0
 
 /* Run time and task stats gathering related definitions. */
-#define configGENERATE_RUN_TIME_STATS           1
+#define configGENERATE_RUN_TIME_STATS           0
 #define configUSE_TRACE_FACILITY                1
 #define configUSE_STATS_FORMATTING_FUNCTIONS    1
 #define configSTATS_BUFFER_MAX_LENGTH           ( ( size_t ) 1024 )
 
-uint32_t ulGetRunTimeCounterValue(void);
-#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS() do {} while (0)
-#define portGET_RUN_TIME_COUNTER_VALUE()         ulGetRunTimeCounterValue()
-
-/* Task switch trace hooks for sub-microsecond RAM execution timeline */
-void vTaskTraceSwitchedIn(void);
-void vTaskTraceSwitchedOut(void);
-#define traceTASK_SWITCHED_IN()                  vTaskTraceSwitchedIn()
-#define traceTASK_SWITCHED_OUT()                 vTaskTraceSwitchedOut()
+/* Functional run: unreliable fine SysTick trace and runtime percentages are disabled. */
 
 /* Software timer definitions. */
 #define configUSE_TIMERS                        1
