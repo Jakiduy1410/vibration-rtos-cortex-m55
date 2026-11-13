@@ -14,7 +14,7 @@ Cần GNU Arm GCC và QEMU trên PATH. Chạy `mingw32-make` (hoặc `make`), sa
 
 ## Phạm vi kết quả
 
-Dùng **results/reconciled/** làm nguồn kết quả mới. Những báo cáo và hình ở results/ gốc là bằng chứng của bản cũ, không dùng cho bản báo cáo đã sửa. Các script generate_reports.py/plot_figures.py cũ không dùng để sinh lại kết quả mới.
+Dùng **results/reconciled/** làm nguồn kết quả mới. Những báo cáo và hình ở results/ gốc là bằng chứng của bản cũ, không dùng cho bản báo cáo đã sửa. Các script chạy, gỡ lỗi và sinh báo cáo theo định dạng cũ đã được loại bỏ; dùng `verify_reconciled.py` để chạy và kiểm tra ba kịch bản hiện tại.
 
 Bản mới kiểm tra chức năng, số đếm và HWM; không xuất CPU%, RTA, WCET hoặc độ trễ micro giây từ bộ đếm SysTick cũ. Mục tiêu 10 ms vẫn là yêu cầu chưa xác nhận định lượng. Tickless bật nhưng chưa thử điện năng. Cảnh báo cập nhật biến đầu ra mô phỏng, không điều khiển GPIO STM32 thật. Ngưỡng phổ dùng biên độ một phía chuẩn hóa; peak là max(abs(sample)).
 
