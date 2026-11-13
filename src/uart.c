@@ -67,16 +67,24 @@ void uart_print_float(float val, int decimals)
         uart_putc('-');
         val = -val;
     }
+    float round_bias = 0.5f;
+    for (int i = 0; i < decimals; i++) {
+        round_bias *= 0.1f;
+    }
+    val += round_bias;
+
     uint32_t int_part = (uint32_t)val;
     uart_print_uint(int_part);
-    uart_putc('.');
-
-    float remainder = val - (float)int_part;
-    for (int i = 0; i < decimals; i++) {
-        remainder *= 10.0f;
-        uint32_t d = (uint32_t)remainder;
-        uart_putc((char)('0' + d));
-        remainder -= (float)d;
+    if (decimals > 0) {
+        uart_putc('.');
+        float remainder = val - (float)int_part;
+        for (int i = 0; i < decimals; i++) {
+            remainder *= 10.0f;
+            uint32_t d = (uint32_t)remainder;
+            if (d > 9) d = 9;
+            uart_putc((char)('0' + d));
+            remainder -= (float)d;
+        }
     }
 }
 

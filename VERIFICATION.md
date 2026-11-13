@@ -21,10 +21,10 @@
 | 1.7 | Bộ đệm vết chuyển task trong RAM | `traceTASK_SWITCHED_IN/OUT`, buffer 8,192 sự kiện | `include/FreeRTOSConfig.h:60-64`<br>`src/main.c:190-218` | Thu thập 3,385 sự kiện `[TRACE]`, 0 dropped event, 0 Byte UART overhead lúc chạy | **ĐÃ ĐẠT** [ok] |
 | 1.8 | Đo lường độ trễ & thực thi 4 task | Bộ đếm `(t_ready, t_start, t_end)` qua SysTick | `src/main.c:220-255` (`record_task_metric`) | Thu thập 507 mẫu `[TASK_METRIC]`; tính Max/Mean Latency và Exec Time cho 4 task | **ĐÃ ĐẠT** [ok] |
 | **2** | **Bộ 4 Tác vụ Thời gian thực (Bảng 3.1)** | | | | |
-| 2.1 | `vTaskAlarm` (Tác vụ Báo động) | Phi chu kỳ, $D_i = 10.0$ ms, $C_i = 1.0$ ms, Prio 5, Stack 1,024 B (DTCM) | `src/main.c` (`vTaskAlarm`) | Log: `vTaskAlarm \| 5 \| DTCM \| Alloc: 1024 B \| Used: 328 B \| Free HWM: 696 B`<br>Độ trễ đo: Max=342.92 µs, Mean=121.27 µs $\ll 10$ ms | **ĐÃ ĐẠT** [ok] |
+| 2.1 | `vTaskAlarm` (Tác vụ Báo động) | Phi chu kỳ, $D_i = 10.0$ ms, $C_i = 1.0$ ms, Prio 5, Stack 1,024 B (DTCM) | `src/main.c` (`vTaskAlarm`) | Log: `vTaskAlarm \| 5 \| DTCM \| Alloc: 1024 B \| Used: 328 B \| Free HWM: 696 B`<br>Độ trễ đo: Max=342.92 µs, Mean=121.29 µs $\ll 10$ ms | **ĐÃ ĐẠT** [ok] |
 | 2.2 | `vTaskAcquisition` (Thu thập) | Chu kỳ 64 ms, $D_i = 64$ ms, $C_i = 2.0$ ms, Prio 4, Stack 1,024 B (DTCM) | `src/main.c` (`vTaskAcquisition`) | Log: `vTaskAcquisition \| 4 \| DTCM \| Alloc: 1024 B \| Used: 224 B \| Free HWM: 800 B`<br>Độ trễ đo: Max=39.04 µs, Mean=5.40 µs $\ll 64$ ms | **ĐÃ ĐẠT** [ok] |
 | 2.3 | `vTaskProcessing` (Xử lý FFT) | Chu kỳ 64 ms, $D_i = 64$ ms, $C_i = 12.0$ ms, Prio 3, Stack 4,096 B (DTCM) | `src/main.c` (`vTaskProcessing`) | Log: `vTaskProcessing \| 3 \| DTCM \| Alloc: 4096 B \| Used: 560 B \| Free HWM: 3536 B`<br>Độ trễ đo: Max=6543.52 µs, Exec Max=6983.08 µs $\ll 64$ ms | **ĐÃ ĐẠT** [ok] |
-| 2.4 | `vTaskLogging` (Ghi nhật ký) | Chu kỳ 1,000 ms, $D_i = 1,000$ ms, $C_i = 20.0$ ms, Prio 2, Stack 2,048 B (SRAM) | `src/main.c` (`vTaskLogging`) | Log: `vTaskLogging \| 2 \| SRAM \| Alloc: 2048 B \| Used: 368 B \| Free HWM: 1680 B`<br>Độ trễ đo: Max=0.03 µs, Exec Max=3000.00 µs $\ll 1,000$ ms | **ĐÃ ĐẠT** [ok] |
+| 2.4 | `vTaskLogging` (Ghi nhật ký) | Chu kỳ 1,000 ms, $D_i = 1,000$ ms, $C_i = 20.0$ ms, Prio 2, Stack 2,048 B (SRAM) | `src/main.c` (`vTaskLogging`) | Log: `vTaskLogging \| 2 \| SRAM \| Alloc: 2048 B \| Used: 368 B \| Free HWM: 1680 B`<br>Độ trễ đo: Max=0.04 µs, Exec Max=3000.00 µs $\ll 1,000$ ms | **ĐÃ ĐẠT** [ok] |
 | 2.5 | `Idle Task` | Chạy khi rảnh, Prio 0, Stack 512 B (128 words, SRAM) | `src/main.c` (`vApplicationIdleHook`)<br>`include/FreeRTOSConfig.h:24` | Log: `Idle Task \| 0 \| SRAM \| Alloc: 512 B \| Used: 160 B \| Free HWM: 352 B` | **ĐÃ ĐẠT** [ok] |
 | 2.6 | Kiểm chứng RMA Schedulability | Tổng tải chu kỳ $U = \frac{2}{64} + \frac{12}{64} + \frac{20}{1000} = 23.9\% < 78.0\%$ ($n=3$) | Báo cáo lý thuyết §3.2.2 & Bảng 3.1 | Hệ thống đáp ứng mọi deadline; kiểm chứng thực tế đo đạc: $U_{\text{meas}} < 2\%$ CPU | **ĐÃ ĐẠT** [ok] |
 | **3** | **Cơ chế Đồng bộ & Giao tiếp (IPC)** | | | | |
@@ -92,21 +92,25 @@ Với $B_i$ là thời gian chặn cực đại (Blocking time) do tranh chấp 
 
 | Tác Vụ | Mức Ưu Tiên | $C_i$ Thiết Kế (§3.3.1) | $C_i$ Đo Thực Tế (Max) | RTA Thiết Kế (§3.3.3) | RTA Đo Thực Tế | Hạn Ngặt ($D_i$) | Biên An Toàn (Slack) | Kết Luận |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| `vTaskAlarm` | **5** | $1.00\text{ ms}$ | **$0.558\text{ ms}$** | $\le 1.00\text{ ms}$ | **$0.564\text{ ms}$** | $10.00\text{ ms}$ | $9.435\text{ ms}$ (94.4%) | **[PASS] [ok]** |
-| `vTaskAcquisition` | **4** | $2.00\text{ ms}$ | **$0.073\text{ ms}$** | $2.00\text{ ms}$ | **$0.073\text{ ms}$** | $64.00\text{ ms}$ | $63.926\text{ ms}$ (99.9%) | **[PASS] [ok]** |
-| `vTaskProcessing` | **3** | $12.00\text{ ms}$ | **$6.983\text{ ms}$** | $15.00\text{ ms}$ | **$7.614\text{ ms}$** | $64.00\text{ ms}$ | $56.385\text{ ms}$ (88.1%) | **[PASS] [ok]** |
-| `vTaskLogging` | **2** | $20.00\text{ ms}$ | **$3.000\text{ ms}$** | $35.00\text{ ms}$ | **$10.614\text{ ms}$** | $1,000.0\text{ ms}$ | $989.385\text{ ms}$ (98.9%) | **[PASS] [ok]** |
+| `vTaskAlarm` | **5** | $1.00\text{ ms}$ | **$0.558\text{ ms}$** | $\le 1.00\text{ ms}$ | **$0.558\text{ ms}$** | $10.00\text{ ms}$ | $9.442\text{ ms}$ (94.4%) | **[PASS] [ok]** |
+| `vTaskAcquisition` | **4** | $2.00\text{ ms}$ | **$0.073\text{ ms}$** | $2.00\text{ ms}$ | **$0.631\text{ ms}$** | $64.00\text{ ms}$ | $63.369\text{ ms}$ (99.0%) | **[PASS] [ok]** |
+| `vTaskProcessing` | **3** | $12.00\text{ ms}$ | **$6.983\text{ ms}$** | $15.00\text{ ms}$ | **$7.714\text{ ms}$** | $64.00\text{ ms}$ | $56.286\text{ ms}$ (87.9%) | **[PASS] [ok]** |
+| `vTaskLogging` | **2** | $20.00\text{ ms}$ | **$3.000\text{ ms}$** | $35.00\text{ ms}$ | **$10.614\text{ ms}$** | $1,000.0\text{ ms}$ | $989.386\text{ ms}$ (98.9%) | **[PASS] [ok]** |
 
-**Chi tiết công thức tính RTA đo thực tế**:
+*Chú thích giả thiết RTA*:
+- $B_3 \le 0.100\text{ ms}$: Giới hạn tự đặt cho đoạn tới hạn sao chép 1 bản ghi 32 byte qua `xLogMutex` giữa `vTaskProcessing` và `vTaskLogging`.
+- $B_4 = 0.000\text{ ms}$: `vTaskLogging` là tác vụ có mức ưu tiên thấp nhất trong 4 tác vụ nên không chịu chặn từ tác vụ ưu tiên thấp hơn.
+
+**Chi tiết công thức tính RTA đo thực tế (§3.3.3)**:
 1. `vTaskAlarm` (Pri 5): Không bị can thiệp bởi task nào ($hp(1) = \emptyset$).
-   $$R_1 = C_1 + T_{\text{switch}} = 0.558 + 0.0064 = \mathbf{0.564\text{ ms}} \le 10.0\text{ ms}$$
-2. `vTaskAcquisition` (Pri 4): Chỉ bị can thiệp bởi Alarm nếu xảy ra ($hp(2) = \{1\}$).
-   $$R_2 = C_2 + I_1 = \mathbf{0.073\text{ ms}} \le 64.0\text{ ms}$$
-3. `vTaskProcessing` (Pri 3): Bị can thiệp bởi Alarm và Acquisition ($hp(3) = \{1, 2\}$).
-   $$R_3 = C_3 + I_1 + I_2 = 6.983 + 0.558 + 0.073 = \mathbf{7.614\text{ ms}} \le 64.0\text{ ms}$$
+   $$R_1 = C_1 = \mathbf{0.558\text{ ms}} \le 10.0\text{ ms}$$
+2. `vTaskAcquisition` (Pri 4): Bị can thiệp bởi Alarm ($hp(2) = \{1\}$).
+   $$R_2 = C_2 + I_1 = 0.073 + 0.558 = \mathbf{0.631\text{ ms}} \le 64.0\text{ ms}$$
+3. `vTaskProcessing` (Pri 3): Bị can thiệp bởi Alarm, Acquisition và chặn $B_3 \le 0.100\text{ ms}$ (sao chép bản ghi 32 byte qua `xLogMutex`):
+   $$R_3 = C_3 + I_1 + I_2 + B_3 = 6.983 + 0.558 + 0.073 + 0.100 = \mathbf{7.714\text{ ms}} \le 64.0\text{ ms}$$
    *(So với RTA thiết kế $15.0\text{ ms}$, RTA thực tế rút ngắn gần một nửa nhờ tăng tốc phần cứng Helium MVE trên Cortex-M55)*.
-4. `vTaskLogging` (Pri 2): Bị can thiệp bởi cả 3 task trên và chịu chặn $B_4 \le C_1 = 0.558\text{ ms}$ trên `xLogMutex`:
-   $$R_4 = C_4 + B_4 + I_1 + I_2 + I_3 = 3.000 + 0.558 + 0.073 + 6.983 = \mathbf{10.614\text{ ms}} \le 1,000.0\text{ ms}$$
+4. `vTaskLogging` (Pri 2): Bị can thiệp bởi cả 3 task trên ($B_4 = 0.000\text{ ms}$ do Logging là tác vụ ưu tiên thấp nhất):
+   $$R_4 = C_4 + I_1 + I_2 + I_3 + B_4 = 3.000 + 0.558 + 0.073 + 6.983 + 0.000 = \mathbf{10.614\text{ ms}} \le 1,000.0\text{ ms}$$
    *(So với RTA thiết kế $35.0\text{ ms}$, biên độ an toàn đạt tới 98.9%)*.
 
 ---
@@ -208,7 +212,7 @@ Trong Kịch bản 3, hệ thống bị ép tải cực hạn ở tốc độ 4 
 - **Sự kiện 4 (Kịch bản 3 Burst Overload Anomaly, T = 2236 ms)**: $\text{Latency} = 0\text{ cycles} = 0.00\ \mu\text{s}$.
 - **Tổng kết độ trễ**:
   - Độ trễ cực đại: $\mathbf{342.92\ \mu\text{s}}\ (8,573\text{ cycles}) \ll 10.0\text{ ms} = 10,000\ \mu\text{s}$ (Biên độ an toàn $> 96.5\%$).
-  - Độ trễ trung bình: $\mathbf{121.27\ \mu\text{s}}\ (3,032\text{ cycles})$.
+  - Độ trễ trung bình: $\mathbf{121.29\ \mu\text{s}}\ (3,032.25\text{ cycles})$.
   - *Tuyên bố học thuật*: Số liệu đo bằng SysTick trên QEMU MPS3 AN547 (25 MHz), chứng minh tính đúng đắn của cơ chế lập lịch tức thời. Trên phần cứng thực tế STM32N6, độ trễ sẽ phụ thuộc vào chu kỳ CPU và bus DTCM. Mẫu đo 0 chu kỳ xảy ra khi cả ISR và đầu task Cảnh báo được thực thi liên tiếp trong cùng một cửa sổ SysTick mô phỏng.
 
 ---

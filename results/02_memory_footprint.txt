@@ -8,16 +8,16 @@ DSP Library  : ARM CMSIS-DSP 5.9.0 (Helium Optimized Vector Math)
 
 [1] BANG TONG QUAT (Berkeley Format):
    text	   data	    bss	    dec	    hex	filename
- 161396	  43860	 180348	 385604	  5e244	build/firmware.elf
+ 161724	  43860	 180348	 385932	  5e38c	build/firmware.elf
 
 
 [2] CHI TIET CAC SECTION BO NHO (System V Format):
 build/firmware.elf  :
 section              size        addr
-.text              161388           0
-.ARM.exidx              8      161388
-.copy.table            24      161396
-.zero.table            16      161420
+.text              161716           0
+.ARM.exidx              8      161716
+.copy.table            24      161724
+.zero.table            16      161748
 .dtcm_data              0   536870912
 .dtcm_bss           12704   536870912
 .data               43820   553648128
@@ -27,28 +27,28 @@ section              size        addr
 .ARM.attributes        58           0
 .comment               18           0
 .debug_line_str       413           0
-.debug_info        148588           0
-.debug_abbrev       23519           0
-.debug_loclists     63349           0
+.debug_info        148804           0
+.debug_abbrev       23508           0
+.debug_loclists     63576           0
 .debug_aranges       3264           0
-.debug_rnglists      7472           0
+.debug_rnglists      7486           0
 .debug_macro        66886           0
-.debug_line         90482           0
-.debug_str         857129           0
-.debug_frame        10272           0
-Total             1681634
+.debug_line         90684           0
+.debug_str         857172           0
+.debug_frame        10280           0
+Total             1682661
 
 
 
 
 [3] PHAN TICH PHAN BO TAI NGUYEN THEO VUNG NHO (MEMORY MAP MPS3 AN547):
 1. Vung FLASH ROM (0x00000000, Dung luong 512 KB):
-   - .text (Executable Code): 161,388 Bytes
+   - .text (Executable Code): 161,716 Bytes
      (Chua Kernel FreeRTOS 11.1.0, CMSIS-DSP 5.9.0 RFFT/CMSIS Core, Vector Table,
       He thong giam sat rung dong va 4 Kich ban kiem chung).
    - .ARM.exidx: 8 Bytes (Exception index table).
    - .copy.table / .zero.table: 40 Bytes (CMSIS Startup init tables).
-   - Tong ROM Flash chiem dung: 161,436 Bytes (157.65 KB / 512 KB, chiem 30.79%).
+   - Tong ROM Flash chiem dung: 161,764 Bytes (157.97 KB / 512 KB, chiem 30.85%).
 
 2. Vung DTCM (0x20000000, Dung luong 128 KB - 0 Wait State):
    - .dtcm_bss: 12,704 Bytes (12.41 KB / 128 KB, chiem 9.69%).

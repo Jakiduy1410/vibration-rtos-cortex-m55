@@ -1448,11 +1448,11 @@ static void print_task_latency_and_runtime_stats(void)
         TaskMetricSummary_t *s = &g_task_stats[tid];
         uint32_t count = s->count;
         float max_lat_u  = (float)s->max_latency_cycles / 25.0f;
-        float mean_lat_u = (count > 0) ? (float)(s->sum_latency_cycles / count) / 25.0f : 0.0f;
+        float mean_lat_u = (count > 0) ? ((float)s->sum_latency_cycles / (float)count) / 25.0f : 0.0f;
         float max_ex_u   = (float)s->max_exec_cycles / 25.0f;
-        float mean_ex_u  = (count > 0) ? (float)(s->sum_exec_cycles / count) / 25.0f : 0.0f;
+        float mean_ex_u  = (count > 0) ? ((float)s->sum_exec_cycles / (float)count) / 25.0f : 0.0f;
 
-        max_c_ms[idx]  = max_ex_u / 1000.0f;
+        max_c_ms[idx]  = (float)((uint32_t)max_ex_u) / 1000.0f;
 
         bool ok = (max_lat_u + max_ex_u <= (float)d_us[idx]);
 
@@ -1503,15 +1503,15 @@ static void print_task_latency_and_runtime_stats(void)
     uart_puts("Task Name        | Prio | Design Ci | Meas Max Ci | Design RTA | Meas RTA   | Deadline  | Slack Margin | Status\r\n");
     uart_puts("-----------------|------|-----------|-------------|------------|------------|-----------|--------------|--------\r\n");
 
-    /* Recalculate RTA from measured worst-case execution times */
+    /* Recalculate RTA from measured worst-case execution times (§3.3.3) */
     float rta_meas[4];
-    /* Alarm: R_alarm = C_alarm + T_switch (approx 0.0064 ms) */
-    rta_meas[0] = max_c_ms[0] + 0.0064f;
-    /* Acquisition (Task 1): R1 = C1 */
-    rta_meas[1] = max_c_ms[1];
-    /* Processing (Task 2): R2 = C2 + ceil(R2/T1)*C1 + B2 (B2 <= C_alarm) */
-    rta_meas[2] = max_c_ms[2] + max_c_ms[1] + max_c_ms[0];
-    /* Logging (Task 3): R3 = C3 + ceil(R3/T1)*C1 + ceil(R3/T2)*C2 + B3 */
+    /* Alarm (Task 1): R_1 = C_1 */
+    rta_meas[0] = max_c_ms[0];
+    /* Acquisition (Task 2): R_2 = C_2 + I_1 (Interference from Alarm) */
+    rta_meas[1] = max_c_ms[1] + max_c_ms[0];
+    /* Processing (Task 3): R_3 = C_3 + I_1 + I_2 + B_3 (B_3 <= 0.100 ms blocking margin) */
+    rta_meas[2] = max_c_ms[2] + max_c_ms[1] + max_c_ms[0] + 0.100f;
+    /* Logging (Task 4): R_4 = C_4 + I_1 + I_2 + I_3 + B_4 (B_4 = 0 ms, lowest priority) */
     rta_meas[3] = max_c_ms[3] + max_c_ms[1] + max_c_ms[2] + max_c_ms[0];
 
     const char *des_ci[4]  = { "1.00 ms ", "2.00 ms ", "12.00 ms", "20.00 ms" };
@@ -1543,6 +1543,7 @@ static void print_task_latency_and_runtime_stats(void)
     }
     uart_puts("----------------------------------------------------------------------------------------------------\r\n");
     uart_puts("* Ghi chu: So lieu do bang SysTick tren QEMU MPS3 AN547 (25 MHz). Toan bo 4 tac vu deu thoa man RTA.\r\n");
+    uart_puts("  Gia thiet RTA: B_3 <= 0.100 ms (gioi han doan toi han sao chep 32 byte), B_4 = 0 ms (vTaskLogging uu tien thap nhat).\r\n");
     uart_puts("====================================================================================================\r\n");
 }
 
@@ -1612,7 +1613,8 @@ static void print_final_benchmark_report(void)
     uint32_t mean_lat_cyc = (g_stats.latency_sample_count > 0) ?
                             (uint32_t)(g_stats.total_alarm_latency_cycles / g_stats.latency_sample_count) : 0;
     float max_lat_us  = (float)g_stats.max_alarm_latency_cycles / 25.0f;
-    float mean_lat_us = (float)mean_lat_cyc / 25.0f;
+    float mean_lat_us = (g_stats.latency_sample_count > 0) ?
+                        ((float)g_stats.total_alarm_latency_cycles / (float)g_stats.latency_sample_count) / 25.0f : 0.0f;
 
     uart_puts("\r\n[3] DO TRE PHAT HIEN -> BAO DONG (DO CHU KY SYSTICK):\r\n");
     uart_puts("    - Do tre cuc dai (Max Latency)       : ");
@@ -1699,9 +1701,15 @@ static void print_final_benchmark_report(void)
     uart_puts("--------------------------------------------------------------------------------\r\n");
     uart_puts("Ngan sach ly thuyet vTaskProcessing (Paper Budget): ~616 Bytes\r\n");
     uart_puts("  (Context: 212 B + Locals: 120 B + FFT Call: 96 B + Unpack: 64 B + API: 80 B + Margin: 44 B)\r\n");
-    uart_puts("  -> So voi cap phat 4096 B: He so an toan 7.7x (Thuc te HWM su dung: ");
+    float proc_safety_factor = (used_proc > 0) ? (4096.0f / (float)used_proc) : 0.0f;
+    float proc_percent = (float)used_proc * 100.0f / 4096.0f;
+    uart_puts("  -> So voi cap phat 4096 B: He so an toan ");
+    uart_print_float(proc_safety_factor, 1);
+    uart_puts("x (Thuc te HWM su dung: ");
     uart_print_uint(used_proc);
-    uart_puts(" Bytes / 12.9%)\r\n");
+    uart_puts(" Bytes / ");
+    uart_print_float(proc_percent, 1);
+    uart_puts("%)\r\n");
     uart_puts("--------------------------------------------------------------------------------\r\n");
     uart_puts("Ghi chu: Free HWM la so byte ngan xep toi thieu con du chua tung bi cham toi.\r\n");
     if (hwm_ok) {

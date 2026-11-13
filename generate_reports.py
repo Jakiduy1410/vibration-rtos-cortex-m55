@@ -83,14 +83,50 @@ if table_match:
 
 # Parse Trace & Task Metric Counts
 trace_events_count = len(re.findall(r'\[TRACE\]', log_content))
-metric_events_count = len(re.findall(r'\[TASK_METRIC\]', log_content))
+metric_events = re.findall(r'\[TASK_METRIC\]\s+tick=(\d+)\s+task=(\w+)\s+latency_cycles=(\d+)\s+exec_cycles=(\d+)', log_content)
+metric_events_count = len(metric_events)
+if metric_events_count == 0:
+    raise ValueError("Missing [TASK_METRIC] records in simulation log!")
 
-# Parse 4-Task Latency & Execution Summary Table
-latency_summary_raw = ""
-m_lat = re.search(r'FOUR-TASK RESPONSE LATENCY & EXECUTION TIME SUMMARY[\s\S]*?(vTaskAlarm[\s\S]*?vTaskLogging[^\n]*)', log_content)
-if m_lat:
-    raw_lines = [l.strip() for l in m_lat.group(1).splitlines() if l.strip().startswith('vTask')]
-    latency_summary_raw = "\n".join(raw_lines)
+# Single Source of Truth: Compute 4-Task Metrics from [TASK_METRIC]
+task_keys_order = ['Alarm', 'Acquisition', 'Processing', 'Logging']
+task_full_names = {
+    'Alarm': 'vTaskAlarm      ',
+    'Acquisition': 'vTaskAcquisition',
+    'Processing': 'vTaskProcessing ',
+    'Logging': 'vTaskLogging    '
+}
+task_prios = {'Alarm': 5, 'Acquisition': 4, 'Processing': 3, 'Logging': 2}
+task_deadlines_us = {'Alarm': 10000, 'Acquisition': 64000, 'Processing': 64000, 'Logging': 1000000}
+
+task_metrics_summary = {}
+for t_key in task_keys_order:
+    lats = [int(m[2]) for m in metric_events if m[1] == t_key]
+    exs  = [int(m[3]) for m in metric_events if m[1] == t_key]
+    cnt = len(lats)
+    if cnt == 0:
+        raise ValueError(f"No metric samples for task {t_key}")
+    max_lat = max(lats) / 25.0
+    mean_lat = sum(lats) / (cnt * 25.0)
+    max_ex = max(exs) / 25.0
+    mean_ex = sum(exs) / (cnt * 25.0)
+    d_us = task_deadlines_us[t_key]
+    ok = (max_lat + max_ex <= d_us)
+    task_metrics_summary[t_key] = {
+        'count': cnt,
+        'max_lat': max_lat,
+        'mean_lat': mean_lat,
+        'max_ex': max_ex,
+        'mean_ex': mean_ex,
+        'deadline_us': d_us,
+        'status': '[PASS] [ok]' if ok else '[FAIL]'
+    }
+
+latency_rows = []
+for k in task_keys_order:
+    st = task_metrics_summary[k]
+    latency_rows.append(f"{task_full_names[k]} |  {task_prios[k]}   |  {st['count']:<5} |  {st['max_lat']:>7.2f}      |  {st['mean_lat']:>7.2f}       |  {st['max_ex']:>7.2f}      |  {st['mean_ex']:>7.2f}       |  {st['deadline_us']:<12} | {st['status']}")
+latency_summary_formatted = "\n".join(latency_rows)
 
 # Parse FreeRTOS Run-time Task Statistics Table
 runtime_stats_raw = ""
@@ -98,6 +134,8 @@ m_rts = re.search(r'FREERTOS RUN-TIME TASK STATISTICS \(vTaskGetRunTimeStats\)[\
 if m_rts:
     raw_lines = [l.strip() for l in m_rts.group(1).splitlines() if l.strip() and not l.strip().startswith('---')]
     runtime_stats_raw = "\n".join(raw_lines)
+else:
+    raise ValueError("Missing runtime statistics in simulation log!")
 
 # Parse FreeRTOS Task List Table
 task_list_raw = ""
@@ -105,6 +143,8 @@ m_tl = re.search(r'FREERTOS TASK LIST & SYSTEM STATE \(vTaskList\)[\s\S]*?Task N
 if m_tl:
     raw_lines = [l.strip() for l in m_tl.group(1).splitlines() if l.strip() and not l.strip().startswith('---')]
     task_list_raw = "\n".join(raw_lines)
+else:
+    raise ValueError("Missing task list in simulation log!")
 
 # Parse RTA Comparison Table
 rta_table_raw = ""
@@ -112,6 +152,42 @@ m_rta = re.search(r'RESPONSE TIME ANALYSIS \(RTA\) COMPARISON[\s\S]*?(vTaskAlarm
 if m_rta:
     raw_lines = [l.strip() for l in m_rta.group(1).splitlines() if l.strip().startswith('vTask')]
     rta_table_raw = "\n".join(raw_lines)
+else:
+    raise ValueError("Missing RTA table in simulation log!")
+
+# Dynamic RTA calculations from the single source of truth
+c_alarm = int(task_metrics_summary['Alarm']['max_ex']) / 1000.0
+c_acq   = int(task_metrics_summary['Acquisition']['max_ex']) / 1000.0
+c_proc  = int(task_metrics_summary['Processing']['max_ex']) / 1000.0
+c_log   = int(task_metrics_summary['Logging']['max_ex']) / 1000.0
+
+b_proc = 0.100  # Blocking margin B_3 <= 0.100 ms (§3.3.3)
+b_log  = 0.000  # B_4 = 0 ms (lowest priority task)
+
+rta_alarm = c_alarm
+rta_acq   = c_acq + c_alarm
+rta_proc  = c_proc + c_alarm + c_acq + b_proc
+rta_log   = c_log + c_alarm + c_acq + c_proc + b_log
+
+slack_alarm = 10.0 - rta_alarm
+slack_acq   = 64.0 - rta_acq
+slack_proc  = 64.0 - rta_proc
+slack_log   = 1000.0 - rta_log
+
+# Parse CPU percentage breakdown
+m_idle_cnt = re.search(r'IDLE\s+(\d+)\s+(\d+)%', log_content)
+m_tmr_cnt = re.search(r'Tmr\s*Svc\s+(\d+)\s+(\d+)%', log_content)
+if not (m_idle_cnt and m_tmr_cnt):
+    raise ValueError("Missing IDLE / Tmr Svc counters in run-time stats!")
+idle_cycles = int(m_idle_cnt.group(1))
+idle_pct_tab = int(m_idle_cnt.group(2))
+tmr_cycles = int(m_tmr_cnt.group(1))
+tmr_pct_tab = int(m_tmr_cnt.group(2))
+
+all_counters = [int(c) for c in re.findall(r'(\d+)\s+(?:<1|\d+)%', runtime_stats_raw)]
+total_rt_cycles = sum(all_counters) if all_counters else (idle_cycles + tmr_cycles)
+idle_pct_exact = (idle_cycles / total_rt_cycles * 100.0) if total_rt_cycles else 93.2
+tmr_pct_exact = (tmr_cycles / total_rt_cycles * 100.0) if total_rt_cycles else 6.2
 
 # --------------------------------------------------------------------------
 # 2. GENERATE results/02_memory_footprint.txt DYNAMICALLY
@@ -425,16 +501,16 @@ Clock Freq   : 25 MHz (QEMU Emulation SysTick Clock)
 ------------------------------------------------------------------------------------------------------------------------
 Task Name        | Prio | Samples | Max Lat (us) | Mean Lat (us) | Max Exec (us) | Mean Exec (us) | Deadline (us) | Status
 -----------------|------|---------|--------------|---------------|---------------|----------------|---------------|--------
-{latency_summary_raw}
+{latency_summary_formatted}
 ------------------------------------------------------------------------------------------------------------------------
 
 [3] DOI CHIEU THOI GIAN DAP UNG RTA: THIET KE VS THUC DO (RESPONSE TIME ANALYSIS - §3.3.3 VS §4.4.4):
 Cong thuc RTA theo Thiet ke Chuong III Muc 3.3.3:
-  * vTaskAlarm       (P5): R_1 = C_1 = 0.408 ms <= 10.0 ms (Thiet ke: <= 1.0 ms)
-  * vTaskAcquisition (P4): R_2 = C_2 + I_1 = 0.046 ms <= 64.0 ms (Thiet ke: 2.0 ms)
-  * vTaskProcessing  (P3): R_3 = C_3 + I_1 + I_2 = 6.958 + 0.401 + 0.046 = 7.406 ms <= 64.0 ms (Thiet ke: 15.0 ms)
-  * vTaskLogging     (P2): R_4 = C_4 + B_4 + I_1 + I_2 + I_3 = 1.518 + 0.401 + 0.046 + 6.958 = 8.925 ms <= 1000.0 ms (Thiet ke: 35.0 ms)
-  (Voi B_4 = max block tren xLogMutex = C_1 = 0.401 ms theo Priority Inheritance Protocol)
+  * vTaskAlarm       (P5): R_1 = C_1 = {c_alarm:.3f} ms <= 10.0 ms (Thiet ke: <= 1.0 ms)
+  * vTaskAcquisition (P4): R_2 = C_2 + I_1 = {c_acq:.3f} + {c_alarm:.3f} = {rta_acq:.3f} ms <= 64.0 ms (Thiet ke: 2.0 ms)
+  * vTaskProcessing  (P3): R_3 = C_3 + I_1 + I_2 + B_3 = {c_proc:.3f} + {c_alarm:.3f} + {c_acq:.3f} + {b_proc:.3f} = {rta_proc:.3f} ms <= 64.0 ms (Thiet ke: 15.0 ms)
+  * vTaskLogging     (P2): R_4 = C_4 + I_1 + I_2 + I_3 + B_4 = {c_log:.3f} + {c_alarm:.3f} + {c_acq:.3f} + {c_proc:.3f} + {b_log:.3f} = {rta_log:.3f} ms <= 1000.0 ms (Thiet ke: 35.0 ms)
+  (Voi B_3 <= {b_proc:.3f} ms la gioi han chan tren doan toi han sao chep ban ghi 32 byte; B_4 = {b_log:.3f} ms do vTaskLogging la tac vu uu tien thap nhat)
 
 ----------------------------------------------------------------------------------------------------
 Task Name        | Prio | Design Ci | Meas Max Ci | Design RTA | Meas RTA   | Deadline  | Slack Margin | Status
@@ -444,15 +520,15 @@ Task Name        | Prio | Design Ci | Meas Max Ci | Design RTA | Meas RTA   | De
 Nhan xet RTA:
 1. Thoi gian thuc thi cuc dai do thuc te (Meas Max Ci) cua ca 4 tac vu deu nho hon dang ke so voi
    ngan sach thiet ke Bang 3.1:
-   - vTaskAlarm: Meas Max Ci = 0.401 ms vs Design Ci = 1.00 ms (tiet kiem 59.9%).
-   - vTaskAcquisition: Meas Max Ci = 0.046 ms vs Design Ci = 2.00 ms (tiet kiem 97.7%).
-   - vTaskProcessing: Meas Max Ci = 6.958 ms vs Design Ci = 12.00 ms (tiet kiem 42.0%, nho Helium CMSIS-DSP).
-   - vTaskLogging: Meas Max Ci = 1.518 ms vs Design Ci = 20.00 ms (tiet kiem 92.4%).
+   - vTaskAlarm: Meas Max Ci = {c_alarm:.3f} ms vs Design Ci = 1.00 ms (tiet kiem {(1.0 - c_alarm)/1.0 * 100.0:.1f}%).
+   - vTaskAcquisition: Meas Max Ci = {c_acq:.3f} ms vs Design Ci = 2.00 ms (tiet kiem {(2.0 - c_acq)/2.0 * 100.0:.1f}%).
+   - vTaskProcessing: Meas Max Ci = {c_proc:.3f} ms vs Design Ci = 12.00 ms (tiet kiem {(12.0 - c_proc)/12.0 * 100.0:.1f}%, nho Helium CMSIS-DSP).
+   - vTaskLogging: Meas Max Ci = {c_log:.3f} ms vs Design Ci = 20.00 ms (tiet kiem {(20.0 - c_log)/20.0 * 100.0:.1f}%).
 2. Thoi gian dap ung thuc te (Meas RTA) dat bien an toan (Slack Margin) rat lon:
-   - vTaskAlarm: Du 9.591 ms (95.9% deadline margin).
-   - vTaskAcquisition: Du 63.953 ms (99.9% deadline margin).
-   - vTaskProcessing: Du 56.593 ms (88.4% deadline margin).
-   - vTaskLogging: Du 991.074 ms (99.1% deadline margin).
+   - vTaskAlarm: Du {slack_alarm:.3f} ms ({slack_alarm/10.0 * 100.0:.1f}% deadline margin).
+   - vTaskAcquisition: Du {slack_acq:.3f} ms ({slack_acq/64.0 * 100.0:.1f}% deadline margin).
+   - vTaskProcessing: Du {slack_proc:.3f} ms ({slack_proc/64.0 * 100.0:.1f}% deadline margin).
+   - vTaskLogging: Du {slack_log:.3f} ms ({slack_log/1000.0 * 100.0:.1f}% deadline margin).
 3. 100% tac vu thoa man tieu chi lap lich thoi gian thuc nghiem ngat, 0 deadline miss.
 
 [4] THONG KE PHAN TRAM SU DUNG CPU TU vTaskGetRunTimeStats:
@@ -461,8 +537,8 @@ Task Name       Run Time Counter   Percentage (%)
 {runtime_stats_raw}
 --------------------------------------------------
 Nhan xet:
-- IDLE task chiem 94% thoi gian CPU, cho thay he thong co nguon tai nguyen CPU rat doi dao.
-- Cac tac vu toi han (vTaskAlarm, vTaskAcquisition, vTaskProcessing) chiem tong cong <2% thoi gian chay CPU
+- IDLE task chiem {idle_pct_tab}% trong bang vTaskGetRunTimeStats (ti le thuc tu bo dem chu ky: {idle_pct_exact:.1f}%, Tmr Svc {tmr_pct_exact:.1f}%); tong {idle_pct_tab}% + {tmr_pct_tab}% = {idle_pct_tab + tmr_pct_tab}% do FreeRTOS lam tron so nguyen doc lap tung tac vu.
+- Cac tac vu toi han (vTaskAlarm, vTaskAcquisition, vTaskProcessing) chiem tong cong <2% thoi gian chay CPU (<1% moi tac vu)
   nho kien truc DMA thu thap theo khoi va thuat toan FFT duoc tang toc toi uu tren ARM Cortex-M55 Helium MVE.
 
 [5] DANH SACH TAC VU VA DUNG LUONG NGAN XEP CON DU TU vTaskList:

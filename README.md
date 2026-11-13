@@ -123,7 +123,7 @@ Trước khi khởi động Scheduler, firmware tự động thực thi Suite 4 
 
 [3] DO TRE PHAT HIEN -> BAO DONG (DO CHU KY SYSTICK):
     - Do tre cuc dai (Max Latency)       : 8573 cycles (342.92 us)
-    - Do tre trung binh (Mean Latency)   : 3032 cycles (121.27 us)
+    - Do tre trung binh (Mean Latency)   : 3032.25 cycles (121.29 us)
     * Ghi chu học thuật: So lieu do bang SysTick tren QEMU MPS3 AN547 (25 MHz).
       Khong phai so do dao dong ky tren phan cung that STM32N6.
 
@@ -153,12 +153,13 @@ Ket luan: [PASS] [ok] Moi Task deu thoa man: Used < Alloc (Khong vuot ngan sach)
 ----------------------------------------------------------------------------------------------------
 Task Name        | Prio | Design Ci | Meas Max Ci | Design RTA | Meas RTA   | Deadline  | Slack Margin | Status
 -----------------|------|-----------|-------------|------------|------------|-----------|--------------|--------
-vTaskAlarm       |  5   | 1.00 ms   |   0.558 ms |  <=1.0 ms  |   0.564 ms | 10.00 ms  |   9.435 ms | [PASS] [ok]
-vTaskAcquisition |  4   | 2.00 ms   |   0.073 ms |  2.00 ms   |   0.073 ms | 64.00 ms  |   63.926 ms | [PASS] [ok]
-vTaskProcessing  |  3   | 12.00 ms  |   6.983 ms |  15.00 ms  |   7.614 ms | 64.00 ms  |   56.385 ms | [PASS] [ok]
-vTaskLogging     |  2   | 20.00 ms  |   3.000 ms |  35.00 ms  |   10.614 ms | 1000.0ms  |   989.385 ms | [PASS] [ok]
+vTaskAlarm       |  5   | 1.00 ms   |   0.558 ms |  <=1.0 ms  |   0.558 ms | 10.00 ms  |   9.442 ms | [PASS] [ok]
+vTaskAcquisition |  4   | 2.00 ms   |   0.073 ms |  2.00 ms   |   0.631 ms | 64.00 ms  |   63.369 ms | [PASS] [ok]
+vTaskProcessing  |  3   | 12.00 ms  |   6.983 ms |  15.00 ms  |   7.714 ms | 64.00 ms  |   56.286 ms | [PASS] [ok]
+vTaskLogging     |  2   | 20.00 ms  |   3.000 ms |  35.00 ms  |   10.614 ms | 1000.0ms  |   989.386 ms | [PASS] [ok]
 ----------------------------------------------------------------------------------------------------
-Ghi chu: Toan bo 4 tac vu deu dat bien an toan (Slack Margin) > 88%, khong co deadline miss.
+Ghi chu: Gia thiet RTA: B_3 <= 0.100 ms (sao chep ban ghi 32 byte), B_4 = 0 ms (uu tien thap nhat).
+         Toan bo 4 tac vu deu dat bien an toan (Slack Margin) > 87%, khong co deadline miss.
 ====================================================================
 ```
 
