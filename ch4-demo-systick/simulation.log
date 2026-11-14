@@ -1,0 +1,364 @@
+
+====================================================================
+   HE THONG GIAM SAT RUNG DONG & CANH BAO BAT THUONG (FreeRTOS)    
+   Thiet ke Chuong III - ARM Cortex-M55 + Helium MVE (QEMU AN547)   
+====================================================================
+[Kernel] FreeRTOS heap_5 initialized: 65536 Bytes in SRAM
+
+====================================================================
+>>> CMSIS-DSP HELIUM REAL FFT GOLDEN VERIFICATION SUITE (512-POINT)
+====================================================================
+[GOLDEN TEST 1] DC Constant (+1.0):
+  - Expected DC = 512.00, AC_max = 0.00
+  - Measured DC = 512.00, AC_max = 0.00 -> [PASS] [ok]
+[GOLDEN TEST 2] Single Unit Impulse:
+  - Expected Flat Spectrum: Mag = 1.00 for all bins
+  - Measured Range: [1.00, 1.00] -> [PASS] [ok]
+[GOLDEN TEST 3] Rectangular Pulse (6 samples):
+  - Expected DC = 6.00, Sinc Envelope
+  - Measured DC = 6.00 -> [PASS] [ok]
+[GOLDEN TEST 4] Sine 3 Cycles, Amplitude 3.0:
+  - Expected Bin 3 Mag = 768.00 (3.0 * 512 / 2), Other bins = 0.00
+  - Measured Bin 3 = 768.00, Other_max = 0.00 -> [PASS] [ok]
+--------------------------------------------------------------------
+>>> ALL 4 GOLDEN FFT VERIFICATION TESTS PASSED [ok] <<<
+====================================================================
+[Kernel] Created IPC Objects: xBlockReady, xBlockQueue(2), xLogQueue(8), xAlarmLogQueue(8), xLogMutex
+[Kernel] Starting FreeRTOS Scheduler with 4 Tasks + Idle (Tick = 1000 Hz)...
+
+====================================================================
+>>> BAT DAU KICH BAN 1: HOAT DONG BINH THUONG VA PHAT HIEN ANOMALY <<<
+    (Cua so 2000 ms; 8 kHz logic, 64 ms/khoi. Chen loi tai Khoi #6 va #14)
+====================================================================
+
+--- [LOGGER TELEMETRY @ 1002 ms] ---
+  [ALARM ENTRY #6] T=384ms | RMS=2.24g | Peak=3.99g | CF=1.79 | Freq=296.9Hz (Bin 19) | Level=2 [ALARM_EVENT]
+  [ALARM ENTRY #14] T=896ms | RMS=2.83g | Peak=4.00g | CF=1.41 | Freq=93.8Hz (Bin 6) | Level=2 [ALARM_EVENT]
+  >> Gen: 15 | Proc: 15 | Overruns: 0 | QueueDrop: 0 | Alarms: 2 | LogDrop: 0 | AlarmDrop: 0 | FreeHeap: 64368 B
+
+>>> KICH BAN 1 HOAN THANH: [PASS] [ok] (Da phat hien dung 2 su kien bat thuong)
+
+====================================================================
+>>> BAT DAU KICH BAN 2: KIEM CHUNG PREEMPTION THAT VA MUTEX PRIORITY INHERITANCE
+====================================================================
+[Process: Real FFT calculation active. Arming mid-FFT hardware preemption interrupt...]
+
+--- [LOGGER TELEMETRY @ 2003 ms] ---
+  [ENTRY #16] T=1024ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  >> Gen: 31 | Proc: 31 | Overruns: 0 | QueueDrop: 0 | Alarms: 2 | LogDrop: 0 | AlarmDrop: 0 | FreeHeap: 64368 B
+[PREEMPTION] IRQ -> Alarm while FFT active -> FFT resumed; RMS/bin valid [PASS] [ok]
+
+====================================================================
+>>> KICH BAN 2 (PHAN B): KIEM CHUNG PRIORITY INHERITANCE THAT TREN xLogMutex
+====================================================================
+[Inheritance Demo] Step 1: Logging (Pri=2) takes xLogMutex
+[Inheritance Demo] Step 2: Processing (Pri=3) requests xLogMutex and blocks...
+[Inheritance Demo] Step 3: Logging priority BOOSTED by FreeRTOS kernel to: 3 (Inherited from waiting Processing Task) [PASS] [ok]
+[Inheritance Demo] Step 4: Acquisition (Pri=4) arrives -> Preempts boosted Logging (4 > 3) [PASS] [ok]
+[Inheritance Demo] Step 5: xLogMutex released -> Logging priority RESTORED to: 2 [PASS] [ok]
+--------------------------------------------------------------------
+>>> PRIORITY INHERITANCE TEST COMPLETED [ok] <<<
+
+--- [LOGGER TELEMETRY @ 2053 ms] ---
+  [ENTRY #32] T=2048ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  >> Gen: 33 | Proc: 33 | Overruns: 0 | QueueDrop: 0 | Alarms: 3 | LogDrop: 0 | AlarmDrop: 0 | FreeHeap: 64368 B
+[S2_TIMING] latency_ticks=1 latency_bound_ms=2 fft_ticks=0 mutex_block_ticks=1
+
+>>> KICH BAN 2 HOAN THANH: [PASS] [ok]
+
+====================================================================
+>>> BAT DAU KICH BAN 3: STRESS TEST & GIOI HAN TAI NGUYEN (DROP-OLDEST)
+    (Burst mode 4 ms/khoi, chen lien tuc anomaly, bao hoa xLogQueue)
+====================================================================
+
+--- [LOGGER TELEMETRY @ 3054 ms] ---
+  [ALARM ENTRY #65] T=2229ms | RMS=2.24g | Peak=3.99g | CF=1.79 | Freq=296.9Hz (Bin 19) | Level=2 [ALARM_EVENT]
+  [ENTRY #260] T=3009ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  [ENTRY #261] T=3013ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  [ENTRY #262] T=3017ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  [ENTRY #265] T=3029ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  [ENTRY #266] T=3033ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  [ENTRY #267] T=3037ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  [ENTRY #268] T=3041ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  [ENTRY #271] T=3053ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  >> Gen: 271 | Proc: 190 | Overruns: 80 | QueueDrop: 0 | Alarms: 4 | LogDrop: 149 | AlarmDrop: 0 | FreeHeap: 64368 B
+
+--- [LOGGER TELEMETRY @ 3500 ms] ---
+  [ENTRY #346] T=3353ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  [ENTRY #349] T=3365ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  [ENTRY #350] T=3369ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  [ENTRY #351] T=3373ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  [ENTRY #352] T=3377ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  [ENTRY #355] T=3389ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  [ENTRY #356] T=3393ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  [ENTRY #357] T=3397ms | RMS=0.71g | Peak=1.00g | CF=1.42 | Freq=93.8Hz (Bin 6) | Level=0 [NORMAL_LOG]
+  >> Gen: 357 | Proc: 249 | Overruns: 108 | QueueDrop: 0 | Alarms: 4 | LogDrop: 199 | AlarmDrop: 0 | FreeHeap: 64368 B
+[S3_TIMING] blocks=216 max_wait_ms=6 mean_wait_ms=2.96 max_resp_ms=6 mean_resp_ms=2.98 deadline_miss=0 max_cpu_ms=1 mean_cpu_ms=0.01 throughput_bps=166.67
+
+>>> KICH BAN 3 HOAN THANH: [PASS] [ok] (Log drop va Overrun da duoc ghi nhan, 0 log canh bao bi mat)
+[BLOCK_T] seq=1 sc=1 gen=65 start=66 end=67
+[BLOCK_T] seq=2 sc=1 gen=128 start=128 end=128
+[BLOCK_T] seq=3 sc=1 gen=192 start=192 end=192
+[BLOCK_T] seq=4 sc=1 gen=256 start=256 end=256
+[BLOCK_T] seq=5 sc=1 gen=320 start=320 end=320
+[BLOCK_T] seq=6 sc=1 gen=384 start=384 end=385
+[BLOCK_T] seq=7 sc=1 gen=448 start=448 end=448
+[BLOCK_T] seq=8 sc=1 gen=512 start=512 end=512
+[BLOCK_T] seq=9 sc=1 gen=576 start=576 end=576
+[BLOCK_T] seq=10 sc=1 gen=640 start=640 end=640
+[BLOCK_T] seq=11 sc=1 gen=704 start=704 end=704
+[BLOCK_T] seq=12 sc=1 gen=768 start=768 end=768
+[BLOCK_T] seq=13 sc=1 gen=832 start=832 end=832
+[BLOCK_T] seq=14 sc=1 gen=896 start=896 end=896
+[BLOCK_T] seq=15 sc=1 gen=960 start=960 end=960
+[BLOCK_T] seq=16 sc=1 gen=1024 start=1024 end=1024
+[BLOCK_T] seq=17 sc=1 gen=1088 start=1088 end=1088
+[BLOCK_T] seq=18 sc=1 gen=1152 start=1152 end=1152
+[BLOCK_T] seq=19 sc=1 gen=1216 start=1216 end=1216
+[BLOCK_T] seq=20 sc=1 gen=1280 start=1280 end=1280
+[BLOCK_T] seq=21 sc=1 gen=1344 start=1344 end=1344
+[BLOCK_T] seq=22 sc=1 gen=1408 start=1408 end=1408
+[BLOCK_T] seq=23 sc=1 gen=1472 start=1472 end=1472
+[BLOCK_T] seq=24 sc=1 gen=1536 start=1536 end=1536
+[BLOCK_T] seq=25 sc=1 gen=1600 start=1600 end=1600
+[BLOCK_T] seq=26 sc=1 gen=1664 start=1664 end=1664
+[BLOCK_T] seq=27 sc=1 gen=1728 start=1728 end=1728
+[BLOCK_T] seq=28 sc=1 gen=1792 start=1792 end=1792
+[BLOCK_T] seq=29 sc=1 gen=1856 start=1856 end=1856
+[BLOCK_T] seq=30 sc=1 gen=1920 start=1920 end=1920
+[BLOCK_T] seq=31 sc=1 gen=1984 start=1984 end=1984
+[BLOCK_T] seq=32 sc=2 gen=2048 start=2048 end=2049
+[BLOCK_T] seq=33 sc=2 gen=2052 start=2052 end=2053
+[BLOCK_T] seq=34 sc=3 gen=2105 start=2105 end=2105
+[BLOCK_T] seq=35 sc=3 gen=2109 start=2111 end=2111
+[BLOCK_T] seq=36 sc=3 gen=2113 start=2117 end=2117
+[BLOCK_T] seq=37 sc=3 gen=2117 start=2123 end=2123
+[BLOCK_T] seq=40 sc=3 gen=2129 start=2129 end=2129
+[BLOCK_T] seq=41 sc=3 gen=2133 start=2135 end=2135
+[BLOCK_T] seq=42 sc=3 gen=2137 start=2141 end=2141
+[BLOCK_T] seq=43 sc=3 gen=2141 start=2147 end=2147
+[BLOCK_T] seq=46 sc=3 gen=2153 start=2153 end=2153
+[BLOCK_T] seq=47 sc=3 gen=2157 start=2159 end=2159
+[BLOCK_T] seq=48 sc=3 gen=2161 start=2165 end=2165
+[BLOCK_T] seq=49 sc=3 gen=2165 start=2171 end=2171
+[BLOCK_T] seq=52 sc=3 gen=2177 start=2177 end=2177
+[BLOCK_T] seq=53 sc=3 gen=2181 start=2183 end=2183
+[BLOCK_T] seq=54 sc=3 gen=2185 start=2189 end=2189
+[BLOCK_T] seq=55 sc=3 gen=2189 start=2195 end=2195
+[BLOCK_T] seq=58 sc=3 gen=2201 start=2201 end=2202
+[BLOCK_T] seq=59 sc=3 gen=2205 start=2208 end=2208
+[BLOCK_T] seq=60 sc=3 gen=2209 start=2214 end=2214
+[BLOCK_T] seq=63 sc=3 gen=2221 start=2221 end=2221
+[BLOCK_T] seq=64 sc=3 gen=2225 start=2227 end=2227
+[BLOCK_T] seq=65 sc=3 gen=2229 start=2233 end=2233
+[BLOCK_T] seq=66 sc=3 gen=2233 start=2239 end=2239
+[BLOCK_T] seq=69 sc=3 gen=2245 start=2245 end=2245
+[BLOCK_T] seq=70 sc=3 gen=2249 start=2251 end=2251
+[BLOCK_T] seq=71 sc=3 gen=2253 start=2257 end=2257
+[BLOCK_T] seq=72 sc=3 gen=2257 start=2263 end=2263
+[BLOCK_T] seq=75 sc=3 gen=2269 start=2269 end=2269
+[BLOCK_T] seq=76 sc=3 gen=2273 start=2275 end=2275
+[BLOCK_T] seq=77 sc=3 gen=2277 start=2281 end=2281
+[BLOCK_T] seq=78 sc=3 gen=2281 start=2287 end=2287
+[BLOCK_T] seq=81 sc=3 gen=2293 start=2293 end=2293
+[BLOCK_T] seq=82 sc=3 gen=2297 start=2299 end=2299
+[BLOCK_T] seq=83 sc=3 gen=2301 start=2305 end=2305
+[BLOCK_T] seq=84 sc=3 gen=2305 start=2311 end=2311
+[BLOCK_T] seq=87 sc=3 gen=2317 start=2317 end=2317
+[BLOCK_T] seq=88 sc=3 gen=2321 start=2323 end=2323
+[BLOCK_T] seq=89 sc=3 gen=2325 start=2329 end=2329
+[BLOCK_T] seq=90 sc=3 gen=2329 start=2335 end=2335
+[BLOCK_T] seq=93 sc=3 gen=2341 start=2341 end=2341
+[BLOCK_T] seq=94 sc=3 gen=2345 start=2347 end=2347
+[BLOCK_T] seq=95 sc=3 gen=2349 start=2353 end=2353
+[BLOCK_T] seq=96 sc=3 gen=2353 start=2359 end=2359
+[BLOCK_T] seq=99 sc=3 gen=2365 start=2365 end=2365
+[BLOCK_T] seq=100 sc=3 gen=2369 start=2371 end=2371
+[BLOCK_T] seq=101 sc=3 gen=2373 start=2377 end=2377
+[BLOCK_T] seq=102 sc=3 gen=2377 start=2383 end=2383
+[BLOCK_T] seq=105 sc=3 gen=2389 start=2389 end=2389
+[BLOCK_T] seq=106 sc=3 gen=2393 start=2395 end=2395
+[BLOCK_T] seq=107 sc=3 gen=2397 start=2401 end=2401
+[BLOCK_T] seq=108 sc=3 gen=2401 start=2407 end=2407
+[BLOCK_T] seq=111 sc=3 gen=2413 start=2413 end=2413
+[BLOCK_T] seq=112 sc=3 gen=2417 start=2419 end=2419
+[BLOCK_T] seq=113 sc=3 gen=2421 start=2425 end=2425
+[BLOCK_T] seq=114 sc=3 gen=2425 start=2431 end=2431
+[BLOCK_T] seq=117 sc=3 gen=2437 start=2437 end=2437
+[BLOCK_T] seq=118 sc=3 gen=2441 start=2443 end=2443
+[BLOCK_T] seq=119 sc=3 gen=2445 start=2449 end=2449
+[BLOCK_T] seq=120 sc=3 gen=2449 start=2455 end=2455
+[BLOCK_T] seq=123 sc=3 gen=2461 start=2461 end=2461
+[BLOCK_T] seq=124 sc=3 gen=2465 start=2467 end=2467
+[BLOCK_T] seq=125 sc=3 gen=2469 start=2473 end=2473
+[BLOCK_T] seq=126 sc=3 gen=2473 start=2479 end=2479
+[BLOCK_T] seq=129 sc=3 gen=2485 start=2485 end=2485
+[BLOCK_T] seq=130 sc=3 gen=2489 start=2491 end=2491
+[BLOCK_T] seq=131 sc=3 gen=2493 start=2497 end=2497
+[BLOCK_T] seq=132 sc=3 gen=2497 start=2503 end=2503
+[BLOCK_T] seq=135 sc=3 gen=2509 start=2509 end=2509
+[BLOCK_T] seq=136 sc=3 gen=2513 start=2515 end=2515
+[BLOCK_T] seq=137 sc=3 gen=2517 start=2521 end=2521
+[BLOCK_T] seq=138 sc=3 gen=2521 start=2527 end=2527
+[BLOCK_T] seq=141 sc=3 gen=2533 start=2533 end=2533
+[BLOCK_T] seq=142 sc=3 gen=2537 start=2539 end=2539
+[BLOCK_T] seq=143 sc=3 gen=2541 start=2545 end=2545
+[BLOCK_T] seq=144 sc=3 gen=2545 start=2551 end=2551
+[BLOCK_T] seq=147 sc=3 gen=2557 start=2557 end=2557
+[BLOCK_T] seq=148 sc=3 gen=2561 start=2563 end=2563
+[BLOCK_T] seq=149 sc=3 gen=2565 start=2569 end=2569
+[BLOCK_T] seq=150 sc=3 gen=2569 start=2575 end=2575
+[BLOCK_T] seq=153 sc=3 gen=2581 start=2581 end=2581
+[BLOCK_T] seq=154 sc=3 gen=2585 start=2587 end=2587
+[BLOCK_T] seq=155 sc=3 gen=2589 start=2593 end=2593
+[BLOCK_T] seq=156 sc=3 gen=2593 start=2599 end=2599
+[BLOCK_T] seq=159 sc=3 gen=2605 start=2605 end=2605
+[BLOCK_T] seq=160 sc=3 gen=2609 start=2611 end=2611
+[BLOCK_T] seq=161 sc=3 gen=2613 start=2617 end=2617
+[BLOCK_T] seq=162 sc=3 gen=2617 start=2623 end=2623
+[BLOCK_T] seq=165 sc=3 gen=2629 start=2629 end=2629
+[BLOCK_T] seq=166 sc=3 gen=2633 start=2635 end=2635
+[BLOCK_T] seq=167 sc=3 gen=2637 start=2641 end=2641
+[BLOCK_T] seq=168 sc=3 gen=2641 start=2647 end=2647
+[BLOCK_T] seq=171 sc=3 gen=2653 start=2653 end=2653
+[BLOCK_T] seq=172 sc=3 gen=2657 start=2659 end=2659
+[BLOCK_T] seq=173 sc=3 gen=2661 start=2665 end=2665
+[BLOCK_T] seq=174 sc=3 gen=2665 start=2671 end=2671
+[BLOCK_T] seq=177 sc=3 gen=2677 start=2677 end=2677
+[BLOCK_T] seq=178 sc=3 gen=2681 start=2683 end=2683
+[BLOCK_T] seq=179 sc=3 gen=2685 start=2689 end=2689
+[BLOCK_T] seq=180 sc=3 gen=2689 start=2695 end=2695
+[BLOCK_T] seq=183 sc=3 gen=2701 start=2701 end=2701
+[BLOCK_T] seq=184 sc=3 gen=2705 start=2707 end=2707
+[BLOCK_T] seq=185 sc=3 gen=2709 start=2713 end=2713
+[BLOCK_T] seq=186 sc=3 gen=2713 start=2719 end=2719
+[BLOCK_T] seq=189 sc=3 gen=2725 start=2725 end=2725
+[BLOCK_T] seq=190 sc=3 gen=2729 start=2731 end=2731
+[BLOCK_T] seq=191 sc=3 gen=2733 start=2737 end=2737
+[BLOCK_T] seq=192 sc=3 gen=2737 start=2743 end=2743
+[BLOCK_T] seq=195 sc=3 gen=2749 start=2749 end=2749
+[BLOCK_T] seq=196 sc=3 gen=2753 start=2755 end=2755
+[BLOCK_T] seq=197 sc=3 gen=2757 start=2761 end=2761
+[BLOCK_T] seq=198 sc=3 gen=2761 start=2767 end=2767
+[BLOCK_T] seq=201 sc=3 gen=2773 start=2773 end=2773
+[BLOCK_T] seq=202 sc=3 gen=2777 start=2779 end=2779
+[BLOCK_T] seq=203 sc=3 gen=2781 start=2785 end=2785
+[BLOCK_T] seq=204 sc=3 gen=2785 start=2791 end=2791
+[BLOCK_T] seq=207 sc=3 gen=2797 start=2797 end=2797
+[BLOCK_T] seq=208 sc=3 gen=2801 start=2803 end=2803
+[BLOCK_T] seq=209 sc=3 gen=2805 start=2809 end=2809
+[BLOCK_T] seq=210 sc=3 gen=2809 start=2815 end=2815
+[BLOCK_T] seq=213 sc=3 gen=2821 start=2821 end=2821
+[BLOCK_T] seq=214 sc=3 gen=2825 start=2827 end=2827
+[BLOCK_T] seq=215 sc=3 gen=2829 start=2833 end=2833
+[BLOCK_T] seq=216 sc=3 gen=2833 start=2839 end=2839
+[BLOCK_T] seq=219 sc=3 gen=2845 start=2845 end=2845
+[BLOCK_T] seq=220 sc=3 gen=2849 start=2851 end=2851
+[BLOCK_T] seq=221 sc=3 gen=2853 start=2857 end=2857
+[BLOCK_T] seq=222 sc=3 gen=2857 start=2863 end=2863
+[BLOCK_T] seq=225 sc=3 gen=2869 start=2869 end=2869
+[BLOCK_T] seq=226 sc=3 gen=2873 start=2875 end=2875
+[BLOCK_T] seq=227 sc=3 gen=2877 start=2881 end=2881
+[BLOCK_T] seq=228 sc=3 gen=2881 start=2887 end=2887
+[BLOCK_T] seq=231 sc=3 gen=2893 start=2893 end=2893
+[BLOCK_T] seq=232 sc=3 gen=2897 start=2899 end=2899
+[BLOCK_T] seq=233 sc=3 gen=2901 start=2905 end=2905
+[BLOCK_T] seq=234 sc=3 gen=2905 start=2911 end=2911
+[BLOCK_T] seq=237 sc=3 gen=2917 start=2917 end=2917
+[BLOCK_T] seq=238 sc=3 gen=2921 start=2923 end=2923
+[BLOCK_T] seq=239 sc=3 gen=2925 start=2929 end=2929
+[BLOCK_T] seq=240 sc=3 gen=2929 start=2935 end=2935
+[BLOCK_T] seq=243 sc=3 gen=2941 start=2941 end=2942
+[BLOCK_T] seq=244 sc=3 gen=2945 start=2948 end=2948
+[BLOCK_T] seq=245 sc=3 gen=2949 start=2954 end=2954
+[BLOCK_T] seq=248 sc=3 gen=2961 start=2961 end=2961
+[BLOCK_T] seq=249 sc=3 gen=2965 start=2967 end=2967
+[BLOCK_T] seq=250 sc=3 gen=2969 start=2973 end=2973
+[BLOCK_T] seq=251 sc=3 gen=2974 start=2979 end=2979
+[BLOCK_T] seq=254 sc=3 gen=2985 start=2985 end=2986
+[BLOCK_T] seq=255 sc=3 gen=2989 start=2992 end=2992
+[BLOCK_T] seq=256 sc=3 gen=2993 start=2998 end=2998
+[BLOCK_T] seq=259 sc=3 gen=3005 start=3005 end=3005
+[BLOCK_T] seq=260 sc=3 gen=3009 start=3011 end=3011
+[BLOCK_T] seq=261 sc=3 gen=3013 start=3017 end=3017
+[BLOCK_T] seq=262 sc=3 gen=3017 start=3023 end=3023
+[BLOCK_T] seq=265 sc=3 gen=3029 start=3029 end=3029
+[BLOCK_T] seq=266 sc=3 gen=3033 start=3035 end=3035
+[BLOCK_T] seq=267 sc=3 gen=3037 start=3041 end=3041
+[BLOCK_T] seq=268 sc=3 gen=3041 start=3047 end=3047
+[BLOCK_T] seq=271 sc=3 gen=3053 start=3053 end=3053
+[BLOCK_T] seq=272 sc=3 gen=3057 start=3059 end=3059
+[BLOCK_T] seq=273 sc=3 gen=3061 start=3065 end=3065
+[BLOCK_T] seq=274 sc=3 gen=3066 start=3071 end=3071
+[BLOCK_T] seq=277 sc=3 gen=3077 start=3077 end=3077
+[BLOCK_T] seq=278 sc=3 gen=3081 start=3083 end=3083
+[BLOCK_T] seq=279 sc=3 gen=3085 start=3089 end=3089
+[BLOCK_T] seq=280 sc=3 gen=3089 start=3095 end=3095
+[BLOCK_T] seq=283 sc=3 gen=3101 start=3101 end=3101
+[BLOCK_T] seq=284 sc=3 gen=3105 start=3107 end=3107
+[BLOCK_T] seq=285 sc=3 gen=3109 start=3113 end=3113
+[BLOCK_T] seq=286 sc=3 gen=3113 start=3119 end=3119
+[BLOCK_T] seq=289 sc=3 gen=3125 start=3125 end=3125
+[BLOCK_T] seq=290 sc=3 gen=3129 start=3131 end=3131
+[BLOCK_T] seq=291 sc=3 gen=3133 start=3137 end=3137
+[BLOCK_T] seq=292 sc=3 gen=3137 start=3143 end=3143
+[BLOCK_T] seq=295 sc=3 gen=3149 start=3149 end=3149
+[BLOCK_T] seq=296 sc=3 gen=3153 start=3155 end=3155
+[BLOCK_T] seq=297 sc=3 gen=3157 start=3161 end=3161
+[BLOCK_T] seq=298 sc=3 gen=3161 start=3167 end=3167
+[BLOCK_T] seq=301 sc=3 gen=3173 start=3173 end=3173
+[BLOCK_T] seq=302 sc=3 gen=3177 start=3179 end=3179
+[BLOCK_T] seq=303 sc=3 gen=3181 start=3185 end=3185
+[BLOCK_T] seq=304 sc=3 gen=3185 start=3191 end=3191
+[BLOCK_T] seq=307 sc=3 gen=3197 start=3197 end=3197
+[BLOCK_T] seq=308 sc=3 gen=3201 start=3203 end=3203
+[BLOCK_T] seq=309 sc=3 gen=3205 start=3209 end=3209
+[BLOCK_T] seq=310 sc=3 gen=3209 start=3215 end=3215
+[BLOCK_T] seq=313 sc=3 gen=3221 start=3221 end=3221
+[BLOCK_T] seq=314 sc=3 gen=3225 start=3227 end=3227
+[BLOCK_T] seq=315 sc=3 gen=3229 start=3233 end=3233
+[BLOCK_T] seq=316 sc=3 gen=3233 start=3239 end=3239
+[BLOCK_T] seq=319 sc=3 gen=3245 start=3245 end=3245
+[BLOCK_T] seq=320 sc=3 gen=3249 start=3251 end=3251
+[BLOCK_T] seq=321 sc=3 gen=3253 start=3257 end=3257
+[BLOCK_T] seq=322 sc=3 gen=3257 start=3263 end=3263
+[BLOCK_T] seq=325 sc=3 gen=3269 start=3269 end=3269
+[BLOCK_T] seq=326 sc=3 gen=3273 start=3275 end=3275
+[BLOCK_T] seq=327 sc=3 gen=3277 start=3281 end=3281
+[BLOCK_T] seq=328 sc=3 gen=3281 start=3287 end=3287
+[BLOCK_T] seq=331 sc=3 gen=3293 start=3293 end=3293
+[BLOCK_T] seq=332 sc=3 gen=3297 start=3299 end=3299
+[BLOCK_T] seq=333 sc=3 gen=3301 start=3305 end=3305
+[BLOCK_T] seq=334 sc=3 gen=3305 start=3311 end=3311
+[BLOCK_T] seq=337 sc=3 gen=3317 start=3317 end=3317
+[BLOCK_T] seq=338 sc=3 gen=3321 start=3323 end=3323
+[BLOCK_T] seq=339 sc=3 gen=3325 start=3329 end=3329
+[BLOCK_T] seq=340 sc=3 gen=3329 start=3335 end=3335
+[BLOCK_T] seq=343 sc=3 gen=3341 start=3341 end=3341
+[BLOCK_T] seq=344 sc=3 gen=3345 start=3347 end=3347
+[BLOCK_T] seq=345 sc=3 gen=3349 start=3353 end=3353
+[BLOCK_T] seq=346 sc=3 gen=3353 start=3359 end=3359
+[BLOCK_T] seq=349 sc=3 gen=3365 start=3365 end=3365
+[BLOCK_T] seq=350 sc=3 gen=3369 start=3371 end=3371
+[BLOCK_T] seq=351 sc=3 gen=3373 start=3377 end=3377
+[BLOCK_T] seq=352 sc=3 gen=3377 start=3383 end=3383
+[BLOCK_T] seq=355 sc=3 gen=3389 start=3389 end=3389
+[BLOCK_T] seq=356 sc=3 gen=3393 start=3395 end=3395
+[BLOCK_T] seq=357 sc=3 gen=3397 start=3401 end=3401
+
+[RESULTS] Functional run; no CPU%, WCET, RTA or microsecond latency claims
+[COUNTS] scenario=0 generated_blocks=357 processed_blocks=249 isr_overrun_count=108 queue_dropped_blocks=0 alarm_actuate_count=4 normal_logs_generated=217 normal_logs_written=18 normal_logs_dropped=199 alarm_logs_generated=3 alarm_logs_written=3 alarm_logs_dropped=0
+[COUNTS] scenario=1 generated_blocks=31 processed_blocks=31 isr_overrun_count=0 queue_dropped_blocks=0 alarm_actuate_count=2 normal_logs_generated=1 normal_logs_written=1 normal_logs_dropped=0 alarm_logs_generated=2 alarm_logs_written=2 alarm_logs_dropped=0
+[COUNTS] scenario=2 generated_blocks=2 processed_blocks=2 isr_overrun_count=0 queue_dropped_blocks=0 alarm_actuate_count=1 normal_logs_generated=1 normal_logs_written=1 normal_logs_dropped=0 alarm_logs_generated=0 alarm_logs_written=0 alarm_logs_dropped=0
+[COUNTS] scenario=3 generated_blocks=324 processed_blocks=216 isr_overrun_count=108 queue_dropped_blocks=0 alarm_actuate_count=1 normal_logs_generated=215 normal_logs_written=16 normal_logs_dropped=199 alarm_logs_generated=1 alarm_logs_written=1 alarm_logs_dropped=0
+[ALARM_STATE] output=7 test_events=1
+[HEAP] total=65536 free=64368 minimum_free=64368
+[STACK] task=Alarm alloc=1024 free=856 used=168
+[STACK] task=Acquisition alloc=1024 free=840 used=184
+[STACK] task=Processing alloc=4096 free=3464 used=632
+[STACK] task=Logging alloc=2048 free=1704 used=344
+[STACK] task=Idle alloc=512 free=352 used=160
+[STACK] task=TmrSvc alloc=1024 free=568 used=456
+[STACK_CHECK] [PASS] [ok]
+
+[QEMU] ALL 3 SCENARIOS COMPLETED SUCCESSFULLY. EXITING SIMULATION...

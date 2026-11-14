@@ -1,0 +1,288 @@
+% ============================================================================
+% BẢN NHÁP DEMO — CHƯƠNG IV, BẢN SYSTICK (chưa đưa vào báo cáo chính).
+% Viết 2026-11-14 từ lần chạy lại commit 17d047d trên máy trợ lý
+% (Ubuntu 24.04, GCC 13.2.1, QEMU 8.2.2) và nhật ký simulation.log của lần chạy đó.
+% Thêm mục đo thời gian bằng SysTick (độ phân giải 1 ms) và ba hình mới vẽ từ
+% 249 bản ghi [BLOCK_T]: Gantt đo thật, chờ/đáp ứng kịch bản 3, giới hạn độ trễ S2.
+% Biên dịch: pdflatex chuong4-demo-systick.tex (TinyTeX, chạy 2 lần).
+% ============================================================================
+\documentclass[12pt,a4paper,oneside]{report}
+
+\usepackage[T5]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[vietnamese]{babel}
+\usepackage{mathptmx}
+\usepackage[top=2.5cm,bottom=2.5cm,left=3cm,right=2cm]{geometry}
+\setlength{\emergencystretch}{3em}
+
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{indentfirst}
+\setlength{\parindent}{1cm}
+\setlength{\parskip}{0pt}
+
+\usepackage{titlesec}
+\renewcommand{\thechapter}{\arabic{chapter}}
+\renewcommand{\chaptername}{CHƯƠNG}
+\renewcommand{\thetable}{\arabic{chapter}.\arabic{table}}
+\renewcommand{\thefigure}{\arabic{chapter}.\arabic{figure}}
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries\centering}{\chaptername\ \thechapter}{20pt}{\Huge}
+\titleformat{\section}{\normalfont\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection}{1em}{}
+\titlespacing*{\chapter}{0pt}{30pt}{20pt}
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+\titlespacing*{\subsection}{0pt}{12pt}{4pt}
+
+\usepackage{enumitem}
+\setlist[itemize,1]{label=\textbullet,leftmargin=*,itemsep=2pt,parsep=0pt,topsep=4pt}
+\setlist[enumerate,1]{label=\arabic*.,leftmargin=*,itemsep=2pt,parsep=0pt,topsep=4pt}
+
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{amsmath}
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage[hidelinks,unicode]{hyperref}
+\usepackage{xurl}
+
+\begin{document}
+
+\setcounter{chapter}{3}
+
+\chapter{XÂY DỰNG, THỰC NGHIỆM VÀ ĐÁNH GIÁ HỆ THỐNG GIÁM SÁT RUNG ĐỘNG TRÊN ARM CORTEX-M55 BẰNG QEMU VÀ FREERTOS}
+\label{chap:4}
+
+\begin{center}
+\small\itshape
+Bản nháp demo — nội dung Chương IV viết từ lần chạy lại commit 17d047d trên máy trợ lý (Ubuntu 24.04, GCC 13.2.1, QEMU 8.2.2) và nhật ký simulation.log của lần chạy đó; chưa đưa vào báo cáo chính. Bản này bổ sung mục đo thời gian bằng SysTick và ba hình mới vẽ từ 249 bản ghi [BLOCK\_T].
+\end{center}
+
+Chương này hiện thực thiết kế Chương~3 và kiểm tra bằng ba kịch bản chạy liên tiếp trên QEMU MPS3 AN547. Trọng tâm là phân công tác vụ, chiếm quyền CPU, đồng bộ, quyền sở hữu bộ đệm và xử lý quá tải. Số liệu được cập nhật từ nhật ký của lần chạy lại; không sử dụng lại số đếm hay biểu đồ thời gian của lần chạy cũ. QEMU là môi trường mô phỏng chức năng, chưa cung cấp chứng cứ về deadline hoặc hiệu năng STM32N657X0 thật. Mục 4.4.4 bổ sung số đo thời gian ở độ phân giải 1 ms bằng SysTick; đây là giới hạn thô, không phải phép đo micro giây.
+
+\section{Mục tiêu và môi trường thực nghiệm}
+\subsection{Mục tiêu, phạm vi và phương pháp kiểm chứng}
+Thực nghiệm kiểm tra bốn yêu cầu: luồng khối dữ liệu và phát hiện bất thường tổng hợp; tác vụ Cảnh báo chiếm quyền khi Xử lý đang FFT; kernel thực hiện kế thừa ưu tiên trong bài thử mutex riêng; và hệ thống ghi nhận mất dữ liệu/nhật ký khi tốc độ đầu vào vượt khả năng phục vụ. Cảm biến, ADC, DMA STM32, còi và rơ-le vật lý không có trong phạm vi chạy. Đầu ra cảnh báo là biến trạng thái ứng dụng có thể quan sát được.
+
+Bản nền của kho \url{https://github.com/Jakiduy1410/vibration-rtos-cortex-m55} là commit \texttt{17d047d} (đo thời gian bằng SysTick, độ phân giải 1 ms; mã nguồn giống commit \texttt{31d7b1b}, chỉ sửa tài liệu \texttt{VERIFICATION.md}). Mã chính \texttt{src/main.c} có SHA-256 bắt đầu bằng \texttt{93029b823aec95}, ELF bắt đầu bằng \texttt{cf8ab7b4f27c5e93f}. Hash đầy đủ, lệnh chạy, log, mã thoát và kết quả kiểm tra độc lập được lưu trong thư mục \path{evidence/} của gói nguồn bản demo này. Lần chạy lại này tái lập đúng số đếm của lần chạy \texttt{31d7b1b} (357/249/108), cho thấy số đếm ổn định giữa hai máy và hai phiên bản QEMU khác nhau.
+
+Chương trình chỉ kết thúc thành công khi ba kịch bản và kiểm tra stack đạt. Sau đó \path{verify_reconciled.py} kiểm tra lại mã thoát, các mốc PASS/FAIL, số bản ghi UART, đẳng thức từng kịch bản và tổng. Việc một chương trình in PASS chưa đủ: cần đối chiếu điều kiện trong mã và dữ liệu thô tương ứng. Lần chạy được báo cáo có mã thoát 0 và 29 điều kiện kiểm tra độc lập đều đạt (23 điều kiện chức năng và 6 điều kiện thời gian SysTick).
+
+\subsection{Công cụ thực nghiệm}
+\begin{table}[H]\centering\small
+\caption{Môi trường thực sự dùng cho lần chạy lại này}\label{tab:ch4-tools}
+\begin{tabularx}{\textwidth}{@{}p{3.1cm}p{3.2cm}X@{}}\toprule
+Thành phần & Phiên bản & Vai trò \\ \midrule
+QEMU & 8.2.2 (Debian) & Mô hình MPS3 AN547 / Cortex-M55 \\
+GNU Arm GCC (Ubuntu) & 13.2.1 & Biên dịch C, liên kết ELF \\
+FreeRTOS Kernel & V11.1.0+ & Nguồn vendored, port ARM\_CM55\_NTZ \\
+CMSIS & Gói 5.9.0 & Header và hỗ trợ lõi ARM \\
+CMSIS-DSP & 1.10.0 & FFT và hàm đặc trưng; thêm hook thử nghiệm \\
+Python & 3.12 & Kiểm tra log, trích số liệu và tạo hình \\
+\bottomrule\end{tabularx}\end{table}
+
+Tùy chọn biên dịch giữ \texttt{-mcpu=cortex-m55 -mthumb -mfloat-abi=hard -O2}. MVE/FPU được bật trong cấu hình port; MPU tắt và không triển khai phân tách TrustZone. Tên thư mục \path{non_secure} của port không được dùng để suy ra trạng thái bảo mật thực thi. Cây mã thư viện được giữ trong kho để tái lập. Linker còn cảnh báo về các syscall của newlib-nano chưa triển khai và segment RWX; UART sử dụng driver riêng, nên không mô tả bản build này là không có cảnh báo.
+
+\subsection{Cấu hình mô phỏng và cách tái lập}
+AN547 dùng clock hệ thống 32 MHz, trong khi clock APB là 25 MHz. Cấu hình CPU/SysTick và biến SystemCoreClock của ứng dụng đã được thống nhất ở 32 MHz; tick danh định 1\,000 Hz. Mô hình SSE-300 có ITCM RAM 512 KiB tại 0x00000000 và DTCM RAM 512 KiB tại 0x20000000. Linker dự án chỉ dành 128 KiB đầu DTCM; tên vùng \texttt{FLASH} trong linker là tên đặt cho vùng chứa ảnh chương trình, không chứng minh mô hình có Flash vật lý ở địa chỉ đó. Vùng SRAM dùng cho dữ liệu chung tại 0x21000000 có dung lượng 4 MiB.
+
+Trong thư mục kho, xây dựng bằng \texttt{make}; chạy bằng \texttt{python3 verify\_reconciled.py --qemu <đường-dẫn-qemu-system-arm>}. Script thực thi lệnh tương đương:
+\begin{quote}\small\ttfamily
+qemu-system-arm -machine mps3-an547 -cpu cortex-m55\par
+-display none -monitor none -serial stdio -semihosting\par
+-kernel build/firmware.elf
+\end{quote}
+Đây là bản chạy lại với QEMU 8.2.2 và GCC 13.2.1; số liệu không được trình bày như lặp lại đúng môi trường 11.1.0/13.3.1 của bản chạy trước, dù số đếm tái lập đúng.
+
+\section{Xây dựng chương trình giám sát rung động}
+\subsection{Cấu trúc mã nguồn và cấu hình FreeRTOS}
+Mã chính nằm trong \path{src/main.c}; mã khởi động, hệ thống và UART được tách thành các tập tin riêng. \path{include/FreeRTOSConfig.h} bật lập lịch chiếm quyền, notification, mutex, software timer, kiểm tra tràn stack và cấp phát tĩnh/động. Bốn tác vụ ứng dụng được tạo tĩnh với stack 1, 1, 4 và 2 KiB. Idle và TmrSvc có stack tĩnh riêng. Queue, semaphore và mutex dùng \texttt{heap\_5} trên một mảng 64 KiB.
+
+Tickless Idle vẫn bật như một lựa chọn cấu hình, nhưng chưa có bài thử xác nhận lợi ích năng lượng. Bộ đo vi thời gian ghép tick với SysTick của bản trước và các phép suy ra CPU\%/RTA đã được loại khỏi bản thực nghiệm chức năng này. Bản này dùng nguồn thời gian duy nhất là \texttt{xTaskGetTickCount()} với độ phân giải 1 ms; mọi số đo thời gian trong mục 4.4.4 đều là giới hạn thô ở độ phân giải đó, không phải phép đo micro giây.
+
+\subsection{Hiện thực bốn tác vụ}
+Thu thập ưu tiên 4 chờ semaphore, lấy nửa bộ đệm vừa được nguồn giả lập tạo và gửi mô tả không chặn. Xử lý ưu tiên 3 chờ queue, tính các đặc trưng và so ngưỡng. Cảnh báo ưu tiên 5 chờ notification, đặt \texttt{g\_alarm\_output\_state = 0x07} biểu diễn ba đầu ra mô phỏng rồi trở lại chờ. Tác vụ này không in UART; việc cập nhật đầu ra không phải đợi Ghi log. Ghi log ưu tiên 2 xả queue sự kiện trước queue thường. Các dòng chẩn đoán của kịch bản nằm ngoài luồng nhật ký nghiệp vụ.
+
+Nguồn mẫu hiện tại vẫn tạo 512 giá trị trong ISR thử nghiệm. Đây là cách giữ phạm vi sửa nhỏ, không phải mẫu thiết kế ISR cho phần cứng thật. Khi chuyển sang board, ISR nên báo hoàn tất và giao xử lý dài cho tác vụ hoặc DMA. Nhịp 8 kHz là nhịp logic của dữ liệu tổng hợp, không phải phép đo một ADC thật.
+
+\subsection{Giao tiếp, quyền sở hữu và quản lý tài nguyên}
+\texttt{xBlockReady} báo sự kiện từ ISR tới Thu thập. \texttt{xBlockQueue} sâu 2 chứa con trỏ và metadata. Nguồn kiểm tra cờ bận trước khi sinh mẫu: buffer bận thì tăng bộ đếm và bỏ lượt mới, không ghi đè vùng cũ. Khi gửi mô tả thất bại, Thu thập đếm riêng và trả buffer; khi xử lý xong, Xử lý trả buffer. Vì chỉ có hai vùng mẫu, queue sâu 2 không tương đương có hai khối chờ cộng thêm một vùng độc lập đang xử lý.
+
+\texttt{xLogQueue} và \texttt{xAlarmLogQueue} đều có 8 phần tử 32 byte. Chỉ log thường áp dụng loại bản ghi cũ nhất; cảnh báo được ưu tiên bằng queue riêng và thứ tự xả. Bộ đếm written chỉ tăng sau khi xuất xong bản ghi qua hàm UART. Nó có nghĩa đã xuất từ chương trình, không chứng minh ghi bền trên thiết bị lưu trữ ngoài. Không có nhánh lấy bản ghi rồi bỏ mà vẫn tăng written.
+
+Mutex \texttt{xLogMutex} được dùng trong bài thử kế thừa ưu tiên ở mục~\ref{sec:ch4-s2}. Nó không được coi là khóa bảo vệ phép gửi queue 32 byte của đường vận hành bình thường. Notification cảnh báo dùng cập nhật giá trị mới nhất; không thay thế queue lưu toàn bộ lịch sử sự kiện.
+
+\subsection{Dữ liệu, đơn vị và phương pháp ghi nhận}
+Dữ liệu bình thường là sin 93,75 Hz (bin 6), biên độ 1 g. Ở kịch bản 1, khối 6 thêm thành phần 296,875 Hz (bin 19), biên độ 3 g; khối 14 tăng thành phần cơ bản lên 4 g. Giá trị int16 dùng quy ước 1 g tương ứng 1\,000 LSB. Đỉnh được lấy từ trị tuyệt đối của mẫu. RMS và đỉnh được tính trước FFT. Độ lớn bin 19 được đổi sang biên độ một phía $2|X[19]|/512$ trước khi so ngưỡng 2 g.
+
+Bốn kiểm tra FFT gồm DC, xung đơn vị, xung chữ nhật sáu mẫu và sin ba chu kỳ. Trường hợp sin còn kiểm tra biên độ đã chuẩn hóa bằng 3 g. Các phép thử này kiểm tra những thuộc tính cụ thể, không phải chứng minh đầy đủ thuật toán trên mọi tín hiệu. Thống kê khối và log được tách theo kịch bản; bản ghi log mang nhãn nguồn để dù xả muộn vẫn được tính về đúng kịch bản tạo nó.
+
+Thời gian được ghi bằng \texttt{xTaskGetTickCount()}: một tick bằng 1 ms, sai số lượng tử hóa $\pm$1 ms cho mỗi khoảng đo. Mỗi khối đã xử lý lưu ba mốc (gen, start, end) vào một mảng RAM, rồi in ra thành 249 dòng \texttt{[BLOCK\_T]} sau kịch bản 3; không in UART giữa lúc chạy. Thời gian đáp ứng được định nghĩa là end $-$ gen, trong đó end ghi \emph{trước} \texttt{vTaskDelay(6)} của kịch bản 3, nên đáp ứng không bao gồm 6 ms chờ đó. Độ trễ cảnh báo kịch bản 2 là hiệu hai mốc tick (đầu ra trừ lúc treo ngắt), và được báo cáo dưới dạng giới hạn trên bằng số tick cộng 1 ms.
+
+\section{Thiết kế và thực hiện các kịch bản kiểm thử}
+\subsection{Kịch bản 1: Luồng dữ liệu và phát hiện bất thường}
+Nguồn tạo khối danh định mỗi 64 ms trong cửa sổ 2\,000 ms. Tiêu chí gồm phát hiện đúng khối 6 và 14, hai lần cập nhật cảnh báo, không bỏ khối và không xuất hiện cảnh báo cứng ở các khối bình thường. Lần chạy có 31 khối được xử lý: 29 bình thường, hai bất thường. RMS ghi được khoảng 0,71 g ở trạng thái bình thường, 2,24 g ở khối 6 và 2,83 g ở khối 14; các tần số đỉnh lần lượt gần 93,75 và 296,875 Hz theo bin. Đây là dữ liệu tổng hợp biết trước, chưa đánh giá độ nhạy trên rung động máy thật hay trường hợp vượt ngưỡng mềm độc lập. Hình~\ref{fig:ch4-spectrum} cho thấy phổ của ba tín hiệu và ngưỡng phổ 2,00 g; Hình~\ref{fig:ch4-rms} cho thấy RMS từng khối với hai ngưỡng mềm và cứng.
+\begin{figure}[H]\centering
+\includegraphics[width=\linewidth]{figs/ch4_spectrum.pdf}
+\caption{Phổ biên độ một phía của ba tín hiệu tổng hợp trong kịch bản 1; các bin khác bằng 0. Phổ tính từ định nghĩa tín hiệu tổng hợp, không phải phổ đo từ lần chạy.}\label{fig:ch4-spectrum}
+\end{figure}
+\begin{figure}[H]\centering
+\includegraphics[width=\linewidth]{figs/ch4_rms_s1.pdf}
+\caption{RMS từng khối trong kịch bản 1, với ngưỡng mềm 1,50 g và ngưỡng cứng 2,00 g. Chỉ khối 6, 14 và 16 có bản ghi trong log; các giá trị còn lại tính từ định nghĩa tín hiệu.}\label{fig:ch4-rms}
+\end{figure}
+
+\subsection{Kịch bản 2: Chiếm quyền và bài thử mutex riêng}
+\label{sec:ch4-s2}
+Phần A đặt hook giữa hai giai đoạn FFT để treo ngắt bằng \texttt{NVIC\_SetPendingIRQ}. ISR gửi notification FromISR. Các cờ kiểm tra yêu cầu: FFT còn hoạt động khi ngắt xảy ra; tác vụ Cảnh báo đã cập nhật đầu ra trước khi FFT trở lại; và sau đó FFT hoàn thành với RMS/bin đúng cho khối bình thường. Kết quả đạt cho một lần kích thích. Chuỗi này chứng minh có chiếm quyền và tiếp tục tính toán trong trường hợp đã thử. Độ trễ của chuỗi này được đo bằng tick ở mục 4.4.4, không dùng bất đẳng thức timestamp cũ.
+
+Phần B dàn dựng Ghi log (2) giữ mutex, Xử lý (3) chờ, Logging được kernel nâng lên 3 rồi trở về 2 khi nhả. Thu thập (4) vẫn có thể chiếm quyền tác vụ đang ở mức 3. Việc dừng nguồn và phát ngắt có chủ đích giúp quan sát lặp lại trình tự. Đây là kiểm tra quy tắc kế thừa ưu tiên, chưa phải phép đo cải thiện thời gian đáp ứng hay ví dụ đầy đủ mọi dạng đảo ngược ưu tiên. Tiêu chí kết thúc yêu cầu cả phần A và B đạt; có timeout thất bại nếu kịch bản không hoàn tất.
+
+\subsection{Kịch bản 3: Quá tải và giới hạn tài nguyên}
+Khoảng yêu cầu khối giảm từ 64 ms xuống 4 ms, tức tốc độ yêu cầu tăng 16 lần. Đồng thời, Xử lý chủ động chờ 6 tick mỗi khối và log thường chuyển từ thưa 1:16 sang mỗi khối được xử lý. Vì vậy bài thử tạo nghẽn phục vụ và áp lực queue, không đo tải CPU tăng đúng 16 lần; \texttt{vTaskDelay} làm tác vụ Blocked chứ không tiêu thụ CPU trong toàn khoảng chờ.
+
+Nguồn được dừng ở cuối cửa sổ, chờ các buffer/queue dữ liệu hết việc và yêu cầu Logger xả thật. Điều kiện PASS yêu cầu có bỏ lượt đầu vào, có loại log thường, không mất log cảnh báo trong lần chạy và các đẳng thức bảo toàn đúng. Kiểm tra độc lập đối chiếu thêm số bản ghi UART với written và tổng các kịch bản.
+
+Toàn lần chạy có 4 lần cập nhật đầu ra nhưng 3 bản ghi cảnh báo: một lần là ngắt nhân tạo ở kịch bản 2, không phải phát hiện rung động và không tạo log bất thường; 3 lần còn lại bắt nguồn từ dữ liệu. Không trộn sự kiện kiểm thử vào thống kê cảnh báo nghiệp vụ.
+
+\section{Kết quả thực nghiệm và phân tích}
+\subsection{Kết quả xây dựng và kiểm tra FFT}
+Bốn kiểm tra FFT đạt và cả ba kịch bản hoàn tất với mã thoát 0. Bảng~\ref{tab:ch4-golden} nêu đại lượng thực sự được kiểm tra. Cần phân biệt độ lớn DFT thô với biên độ tín hiệu đã chuẩn hóa.
+\begin{table}[H]\centering\small
+\caption{Các thuộc tính FFT đã được kiểm tra}\label{tab:ch4-golden}
+\begin{tabularx}{\textwidth}{@{}p{3.5cm}Xr@{}}\toprule
+Đầu vào & Tiêu chí & Kết quả \\\midrule
+DC +1 & DC gần 512; AC gần 0 & Đạt \\
+Xung đơn vị & Độ lớn các bin kiểm tra gần 1 & Đạt \\
+Xung sáu mẫu & DC gần 6 & Đạt \\
+Sin biên độ 3, bin 3 & Độ lớn bin 3 gần 768; biên độ chuẩn hóa gần 3 & Đạt \\
+\bottomrule\end{tabularx}\end{table}
+
+Theo section của ELF, vùng chứa mã và bảng khởi tạo chiếm 148480 byte; ảnh khởi tạo \texttt{.data} chiếm 43736 byte. Tổng ảnh nạp theo linker là 192216 byte, khoảng 36,66\% của 512 KiB; không lấy kích thước ELF có thông tin debug làm ROM. \texttt{.dtcm\_bss} dùng 12672 byte trong giới hạn 128 KiB dự án dành ra. Các số này mô tả bố trí tĩnh, không phải đo tốc độ RAM hay khả năng DMA.
+
+\subsection{Kết quả chức năng và điều phối tác vụ}
+Kịch bản 1 phát hiện đúng hai khối bất thường; không có cảnh báo cứng giả trong 29 khối bình thường đã thử. Kịch bản 2 xác nhận trình tự ngắt--Cảnh báo--FFT tiếp tục, đồng thời kết quả RMS/bin sau chiếm quyền vẫn hợp lệ. Trình tự ưu tiên Ghi log 2--3--2 được ghi nhận riêng. Các kết luận này gắn với điều kiện kiểm tra trong mã, không suy ra từ số chu kỳ giả định.
+
+Mục tiêu notification đến cập nhật đầu ra 10 ms được giữ ở Chương III. Bản chạy này xác nhận thô mục tiêu đó ở độ phân giải 1 ms: độ trễ đo được 1 tick, tức giới hạn trên dưới 2 ms, nhỏ hơn hạn 10 ms (mục 4.4.4). Mốc đo là lúc treo ngắt, đứng trước lúc ISR gửi notification, nên khoảng đo này bao trùm cả khoảng mục tiêu của Chương III. Đây là giới hạn thô theo tick, không phải phép đo micro giây. Lần chạy trước của cùng mã nguồn cho 0 tick (dưới 1 ms); chênh lệch do căn chỉnh tick, độ trễ thật vẫn dưới 1 ms. Bộ đếm SysTick ghép với tick trước đây có dấu thời gian đi lùi và có nhánh ép chênh lệch âm về 0; không dùng lại các mẫu 0 hoặc các giá trị 142,24/342,92 micro giây để kết luận deadline. CPU\% và bảng RTA tính từ bộ đếm cũ được rút khỏi kết quả.
+
+\subsection{Khối dữ liệu, nhật ký và bộ nhớ}
+Bảng~\ref{tab:ch4-counts} phân biệt số liệu từng kịch bản với tổng. Generated là số \emph{lượt yêu cầu tạo khối}; nếu buffer bận, dữ liệu mới chưa được tạo. BufferDrop không phải bằng chứng DMA thật đã ghi đè. QueueDrop bằng 0 chỉ cho biết nhánh bỏ do queue đầy chưa xảy ra ở lần chạy này.
+\begin{table}[H]\centering\small
+\caption{Bộ đếm khối và nhật ký của lần chạy lại này}\label{tab:ch4-counts}
+\begin{tabular}{@{}lrrrr@{}}\toprule
+Đại lượng & S1 & S2 & S3 & Tổng \\\midrule
+Yêu cầu khối & 31 & 2 & 324 & 357 \\
+Đã xử lý & 31 & 2 & 216 & 249 \\
+Bỏ do buffer & 0 & 0 & 108 & 108 \\
+Bỏ do queue & 0 & 0 & 0 & 0 \\
+Cập nhật cảnh báo & 2 & 1 & 1 & 4 \\
+Log thường tạo & 1 & 1 & 215 & 217 \\
+Log thường ghi & 1 & 1 & 16 & 18 \\
+Log thường bỏ & 0 & 0 & 199 & 199 \\
+Log cảnh báo tạo & 2 & 0 & 1 & 3 \\
+Log cảnh báo ghi & 2 & 0 & 1 & 3 \\
+Log cảnh báo bỏ & 0 & 0 & 0 & 0 \\
+\bottomrule\end{tabular}\end{table}
+\begin{figure}[H]\centering
+\includegraphics[width=\linewidth]{figs/ch4_blocks.pdf}
+\caption{Số liệu từng kịch bản từ log mới; không gộp tổng cả lần chạy vào kịch bản 3.}\label{fig:ch4-blocks}
+\end{figure}
+Sau khi xả hết công việc, các đẳng thức tổng là:
+\begin{align*}
+357 &= 249 + 108 + 0,\\
+217 &= 18 + 199,\\
+3 &= 3 + 0.
+\end{align*}
+Dòng thứ nhất lần lượt là yêu cầu = xử lý + bỏ do buffer + bỏ do queue; hai dòng sau là nhật ký tạo = ghi + bỏ. Riêng kịch bản 3: 324 = 216 + 108 + 0. Không mất nhật ký cảnh báo đã tạo trong lần chạy không đồng nghĩa không bỏ sót bất thường nằm trong khối chưa được tiếp nhận.
+
+\begin{table}[H]\centering\small
+\caption{Ngăn xếp quan sát qua HWM, đơn vị byte}\label{tab:ch4-stack}
+\begin{tabular}{@{}lrrr@{}}\toprule
+Tác vụ & Cấp phát & Đã chạm tới & HWM còn dư \\\midrule
+Alarm & 1024 & 168 & 856 \\
+Acquisition & 1024 & 184 & 840 \\
+Processing & 4096 & 632 & 3464 \\
+Logging & 2048 & 344 & 1704 \\
+Idle & 512 & 160 & 352 \\
+TmrSvc & 1024 & 456 & 568 \\
+\bottomrule\end{tabular}\end{table}
+\begin{figure}[H]\centering
+\includegraphics[width=\linewidth]{figs/ch4_stacks.pdf}
+\caption{Stack cấp phát và mức đã chạm tới theo HWM ở lần chạy lại này (GCC 13.2.1).}\label{fig:ch4-stack}
+\end{figure}
+HWM trả số word chưa từng bị chạm; chương trình nhân với kích thước phần tử stack để đổi sang byte. Bảng gồm cả Idle và TmrSvc vì dịch vụ định thời tham gia sinh nguồn và điều phối kịch bản. Các giá trị chỉ mô tả đường chạy đã xảy ra; không chứng minh stack không thể tràn ở tải khác. Mức Processing 632 byte cao hơn 528 byte của lần chạy trước do khác phiên bản compiler (13.2.1 so với 13.3.1); không quy chênh lệch này cho tối ưu compiler nếu chưa có phân tích riêng.
+
+Heap dự trữ 65536 byte, còn 64368 byte; mức còn trống thấp nhất quan sát được là 64368 byte. Các stack/TCB tạo tĩnh nằm ngoài heap, nên heap còn nhiều không có nghĩa toàn ứng dụng dùng ít RAM tương ứng. Kết luận phù hợp là không quan sát thiếu heap trong ba kịch bản, không phải chứng minh không rò rỉ bộ nhớ trong mọi thời gian chạy.
+
+\subsection{Đo thời gian bằng SysTick}
+\label{sec:ch4-timing}
+Số đo thời gian trong mục này dùng nguồn duy nhất là \texttt{xTaskGetTickCount()}, một tick bằng 1 ms, sai số lượng tử hóa $\pm$1 ms cho mỗi khoảng đo. Vì vậy mọi giá trị đều là giới hạn thô ở độ phân giải 1 ms: một khoảng đo được $n$ tick có giá trị thật nằm trong khoảng từ $n-1$ đến $n+1$ ms, và giới hạn trên an toàn là $n+1$ ms. Phương pháp này đo được hiện tượng ở thang mili giây (chờ, đáp ứng, trễ hạn, throughput) nhưng không đo được hiện tượng ở thang micro giây (thời gian FFT, thời gian chặn mutex, chuyển ngữ cảnh). Bảng~\ref{tab:ch4-timing} tóm tắt các số đo.
+\begin{table}[H]\centering\small
+\caption{Số đo thời gian SysTick của lần chạy lại này (độ phân giải 1 ms)}\label{tab:ch4-timing}
+\begin{tabularx}{\textwidth}{@{}p{4.6cm}rrX@{}}\toprule
+Đại lượng & Giá trị & Đơn vị & Ghi chú \\\midrule
+\multicolumn{4}{@{}l}{\itshape Kịch bản 2 (độ trễ cảnh báo)} \\
+Độ trễ (latency\_ticks) & 1 & tick & Từ lúc treo ngắt đến khi đầu ra cập nhật \\
+Giới hạn trên độ trễ & $<$ 2 & ms & Số tick cộng 1 ms sai số lượng tử hóa \\
+Thời gian FFT (fft\_ticks) & 0 & tick & Hai giai đoạn FFT, dưới 1 ms \\
+Thời gian chặn mutex & 1 & tick & Giá trị thật trong khoảng 0--2 ms \\
+\multicolumn{4}{@{}l}{\itshape Kịch bản 3 (quá tải)} \\
+Khối đã xử lý & 216 & khối & \\
+Chờ tối đa / trung bình & 6 / 2,96 & ms & Từ lúc tạo khối đến lúc Xử lý nhận \\
+Đáp ứng tối đa / trung bình & 6 / 2,98 & ms & Từ lúc tạo khối đến lúc xử lý xong, chưa gồm 6 ms chờ chủ động \\
+Trễ hạn (đáp ứng $>$ 64 ms) & 0 & khối & \\
+CPU tối đa / trung bình & 1 / 0,01 & ms & FFT và đặc trưng, dưới 1 ms với đa số khối \\
+Throughput & 166,67 & khối/giây & Một khối mỗi 6 ms, khớp nhịp phục vụ \\
+\bottomrule\end{tabularx}\end{table}
+
+Kịch bản 2 cho giới hạn trên độ trễ cảnh báo dưới 2 ms, nhỏ hơn hạn định 10 ms (Hình~\ref{fig:ch4-s2-latency}). Lần chạy trước của cùng mã nguồn cho 0 tick (dưới 1 ms); chênh lệch do căn chỉnh tick — nếu lúc treo ngắt và lúc cập nhật đầu ra rơi vào cùng một tick thì đo được 0, nếu vắt qua mốc tick thì đo được 1. Độ trễ thật vẫn dưới 1 ms trong cả hai lần chạy, và giới hạn dưới 2 ms bao trùm cả hai. Thời gian FFT hai giai đoạn đo được 0 tick (dưới 1 ms), và thời gian chặn mutex đo được 1 tick (giá trị thật trong khoảng 0--2 ms).
+\begin{figure}[H]\centering
+\includegraphics[width=\linewidth]{figs/ch4_s2_latency.pdf}
+\caption{Giới hạn trên độ trễ cảnh báo kịch bản 2 (SysTick 1 ms) so với hạn định 10 ms.}\label{fig:ch4-s2-latency}
+\end{figure}
+
+Kịch bản 3 cho thấy chờ và đáp ứng của từng khối tạo thành răng cưa: chờ lần lượt 0, 2, 4, 6 ms rồi trở về 0 (Hình~\ref{fig:ch4-wait-resp}). Răng cưa này là hệ quả trực tiếp của nhịp tạo khối 4 ms và nhịp phục vụ 6 ms: mỗi khối mới đến trễ hơn khối trước 2 ms trong hàng chờ, cho đến khi buffer đầy thì một khối bị bỏ và pha chờ trở về 0. Chờ tối đa 6 ms đúng bằng chu kỳ phục vụ 6 ms; chờ không vượt quá 6 ms vì hệ thống bỏ khối khi buffer đầy thay vì để hàng chờ dài ra. Đáp ứng bám sát chờ vì thời gian xử lý (FFT và đặc trưng) dưới 1 ms với đa số khối — chỉ 3 trong 216 khối có cpu bằng 1 tick. Không có khối nào trễ hạn 64 ms.
+\begin{figure}[H]\centering
+\includegraphics[width=\linewidth]{figs/ch4_wait_resp_s3.pdf}
+\caption{Chờ và đáp ứng từng khối trong kịch bản 3 (216 khối). Hạn định 64 ms gấp hơn 10 lần giá trị tối đa 6 ms nên không vẽ theo tỉ lệ.}\label{fig:ch4-wait-resp}
+\end{figure}
+
+Hình~\ref{fig:ch4-gantt} là Gantt đo thật của một cửa sổ kịch bản 3 (16 khối đã xử lý đầu tiên, gen 2105--2189 ms), vẽ từ các bản ghi \texttt{[BLOCK\_T]}. Mỗi thanh kéo từ lúc tạo khối (gen) đến lúc xử lý xong (end); đoạn nhạt là chờ trong queue, đoạn đậm là xử lý. Sáu khối bị bỏ trong cửa sổ được đánh dấu X đỏ tại thời điểm tạo của chúng, suy từ lưới tạo khối 4 ms và các khoảng gen 12 ms giữa hai khối đã xử lý liên tiếp. Hình cho thấy chờ chiếm phần lớn thời gian đáp ứng, còn xử lý chỉ là một vạch ngắn — bằng chứng trực quan rằng nghẽn ở kịch bản 3 là nghẽn queue/buffer, không phải nghẽn CPU.
+\begin{figure}[H]\centering
+\includegraphics[width=\linewidth]{figs/ch4_gantt_measured.pdf}
+\caption{Gantt đo thật — một cửa sổ kịch bản 3 (gen 2105--2189 ms). Chờ trong queue chiếm ưu thế; xử lý dưới 1 ms với đa số khối nên chỉ hiện thành vạch ngắn.}\label{fig:ch4-gantt}
+\end{figure}
+
+Giới hạn của số đo này cần được nêu rõ. Độ phân giải 1 ms không cho phép kết luận về thời gian FFT chính xác, thời gian chặn mutex chính xác, hay thời gian chuyển ngữ cảnh — các đại lượng này ở thang micro giây và đều cho kết quả 0 hoặc 1 tick, tức chỉ có giới hạn trên thô. Tương tự, không suy ra CPU\% từ các số đo này: thời gian CPU thực thi khác thời gian trôi qua có chứa Blocked, và \texttt{vTaskDelay} làm tác vụ Blocked chứ không tiêu thụ CPU. Các số đo chỉ xác nhận hệ thống vận hành tốt ở thang mili giây: cảnh báo đáp ứng trong giới hạn thô dưới 2 ms, và không khối nào trễ hạn 64 ms khi quá tải.
+
+\subsection{Đối chiếu yêu cầu và giới hạn}
+\begin{table}[H]\centering\small
+\caption{Phạm vi kết quả được phép kết luận}\label{tab:ch4-scope}
+\begin{tabularx}{\textwidth}{@{}p{4.4cm}X@{}}\toprule
+Yêu cầu / cơ chế & Bằng chứng và giới hạn \\\midrule
+Luồng dữ liệu và phát hiện & Đúng hai khối chỉ định ở S1; 29 khối bình thường không báo cứng giả \\
+Chiếm quyền & Một ngắt thử giữa FFT; Alarm chạy và FFT tiếp tục với kết quả hợp lệ \\
+Kế thừa ưu tiên & Quan sát 2--3--2 trong demo riêng \\
+Quá tải & Có bỏ lượt và loại log; bảo toàn số đếm từng kịch bản; chờ bị chặn ở 6 ms, không trễ hạn \\
+Heap / stack & Các giá trị quan sát còn trong cấp phát; chưa có chứng minh trường hợp xấu nhất \\
+Deadline 10 ms & Giới hạn thô dưới 2 ms ở độ phân giải 1 ms; chưa xác nhận ở mức micro giây \\
+CPU, WCET, RTA & Chưa xác nhận định lượng trong bản chạy này \\
+ADC/DMA, GPIO, máy thật & Chưa triển khai hoặc kiểm chứng \\
+\bottomrule\end{tabularx}\end{table}
+Tải 23,9\% ở Chương III là phép tính từ ngân sách giả định, không phải CPU\% quan sát. Thời gian CPU thực thi khác thời gian trôi qua có chứa Blocked. Một lần chạy với dữ liệu tổng hợp và chính sách bỏ khối không đủ bảo đảm khả năng giám sát mọi bất thường. Việc không có lỗi tràn trong lần chạy chưa chứng minh an toàn bộ nhớ tuyệt đối.
+
+\section{Đánh giá đặc điểm ứng dụng}
+\subsection{Vai trò Cortex-M55 và FreeRTOS}
+Vai trò được thể hiện rõ nhất là FreeRTOS tổ chức công việc trên một lõi ARM: ưu tiên cố định quyết định ai chạy; queue/semaphore/notification quyết định ai chờ và khi nào thức; cờ sở hữu buffer ngăn nguồn phần mềm sửa dữ liệu đang dùng; mutex cho thấy thay đổi ưu tiên khi có tranh chấp. FFT tạo công việc xử lý có ý nghĩa ứng dụng nhưng không trở thành mục tiêu nghiên cứu DSP độc lập.
+
+FPU/MVE là khả năng cấu hình của nền tảng. Chương trình chạy được và kiểm tra kết quả sau chiếm quyền không định lượng mức tăng tốc Helium hoặc chi phí chuyển ngữ cảnh. Tickless chưa được đánh giá về điện năng; MPU/TrustZone chưa được dùng để cô lập tác vụ. Không có suy luận từ số thanh ghi hay xung nhịp sang thời gian thực thi trên STM32.
+
+\subsection{Ưu điểm, hạn chế và khả năng chuyển lên STM32N657X0}
+Ưu điểm là bốn chức năng có ranh giới rõ, có chính sách sở hữu dữ liệu và có bằng chứng số đếm khi quá tải, nay thêm số đo thời gian ở thang mili giây và Gantt đo thật. Giới hạn là nguồn tổng hợp, ISR sinh mẫu còn dài, đầu ra chỉ mô phỏng, cảnh báo có thể gộp notification và nhật ký hữu hạn có thể đầy. Không dùng số liệu QEMU để chứng minh deadline 10 ms trên STM32N657X0 ở mức micro giây.
+
+Khi đưa lên board phải thay nguồn bằng cảm biến/ADC/DMA, chọn RAM ngoại vi truy cập được, tổ chức boot và driver đầu ra, rồi đo lại thời gian, stack và chính sách mất dữ liệu. Cấu trúc tác vụ và phần xử lý có thể tái sử dụng sau khi rà soát giao diện; không mặc định mọi đối tượng đồng bộ giữ nguyên không cần kiểm tra. STM32N657X0 có ST Neural-ART Accelerator; khối này chưa được sử dụng và không phải Ethos-U55 của nền tảng tham chiếu Arm.
+
+\subsection{Phạm vi ứng dụng và hướng phát triển}
+Mô hình phù hợp làm ví dụ giám sát tại biên: thu mẫu, tính đặc trưng, tạo cảnh báo và giữ nhật ký. Kết quả hiện chỉ là phát hiện tín hiệu tổng hợp vượt ngưỡng, chưa chẩn đoán nguyên nhân hỏng vòng bi hoặc dự báo bảo trì trên máy thật. Hướng tiếp theo là nguồn thời gian độc lập đáng tin cậy (FVP hoặc phần cứng thật) để đo micro giây, thử ngưỡng mềm và nhiều kiểu tín hiệu, kiểm tra tải có kiểm soát rồi triển khai trên phần cứng. AI, mạng, MPU/TrustZone và tối ưu vector không phải yêu cầu để hoàn thành phạm vi bài tập này.
+
+\end{document}
