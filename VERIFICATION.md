@@ -53,7 +53,7 @@ Nguồn đo: `xTaskGetTickCount()`, độ phân giải 1 ms, sai số lượng t
 - `latency_ticks`: 0 tick
 - `latency_bound_ms`: 1 ms (giới hạn trên thô: độ trễ cảnh báo < 1 ms)
 - `fft_ticks`: 0 tick (thời gian tính 2 giai đoạn FFT < 1 ms)
-- `mutex_block_ticks`: 0 tick (thời gian chặn mutex trước khi kế thừa ưu tiên giải phóng < 1 ms)
+- `mutex_block_ticks`: 1 tick (thời gian chặn mutex đo được 1 tick, sai số lượng tử hóa ±1 ms (giá trị thật trong khoảng 0–2 ms))
 
 ### Kịch bản 3: Quá tải tài nguyên (`[S3_TIMING]`)
 - `blocks`: 216 khối đã xử lý
