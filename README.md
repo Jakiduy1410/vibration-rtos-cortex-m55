@@ -4,27 +4,30 @@ Bốn tác vụ: Alarm (5), Acquisition (4), Processing (3), Logging (2); kernel
 
 ## Xây dựng và chạy
 
-Cần GNU Arm GCC và QEMU trên PATH. Chạy `mingw32-make` (hoặc `make`), sau đó `python verify_reconciled.py --qemu <qemu-system-arm>`. Cấu hình CPU/SysTick là 32 MHz (`configCPU_CLOCK_HZ = 32000000`), APB của AN547 là 25 MHz. Chi tiết và hash ELF được lưu trong `results/reconciled/summary.json`.
-
-## Nguồn đo thời gian DWT CYCCNT và kiểm chứng
-
-Hệ thống tích hợp đồng hồ chu kỳ DWT CYCCNT làm nguồn đo thời gian độ phân giải cao (`dwt_cycles()`), khởi tạo qua `DEMCR.TRCENA` và `DWT_CTRL.CYCCNTENA`. Trước khi kịch bản 1 bắt đầu, hệ thống thực hiện hai bước kiểm chứng bắt buộc:
-1. **Tính đơn điệu (Monotonicity):** Đọc CYCCNT 10.000 lần liên tiếp, đếm số lần giảm (phải bằng 0).
-2. **Hiệu chuẩn với SysTick (Calibration):** Đo ΔCYCCNT trong 100 tick RTOS (100 ms). Với clock 32 MHz, kỳ vọng ΔCYCCNT ≈ 3.200.000 chu kỳ (dung sai ±1 tick: 3.168.000–3.232.000 chu kỳ) và CYCCNT phải tăng (`actual > 0`).
-
-*Lưu ý về môi trường mô phỏng QEMU MPS3 AN547:*
-QEMU hiện tại không hiện thực hóa khối phần cứng DWT cho profile ARM Cortex-M (truy cập thanh ghi DWT đọc về 0, ghi bị bỏ qua). Do đó trên QEMU, kiểm tra hiệu chuẩn phát hiện CYCCNT đứng yên (`actual=0`) và dừng chương trình ngay lập tức với `[DWT_CHECK] FAIL` theo đúng đặc tả Mục 2c để tránh sinh hoặc bịa số đo sai lệch. Trên phần cứng thật (hoặc trình giả lập hỗ trợ DWT), bước này sẽ PASS và tiếp tục chạy đo đạc ba kịch bản.
+Cần GNU Arm GCC và QEMU trên PATH. Chạy `mingw32-make` (hoặc `make`), sau đó `python verify_reconciled.py --qemu <qemu-system-arm>`. Cấu hình CPU/SysTick là 32 MHz, APB của AN547 là 25 MHz. Bản đã kiểm tra dùng GCC 13.3.1 xPack và QEMU 11.1.0; chi tiết và hash ELF trong `results/reconciled/summary.json`. Không commit mới; đây là thay đổi cục bộ trên nền 90ce744.
 
 ## Ba kịch bản
 
-1. **Kịch bản 1 (Danh định):** Cửa sổ 2000 ms, 31 khối, phát hiện đúng hai khối bất thường #6 (lỗi ổ bi 300 Hz) và #14 (mất cân bằng 100 Hz).
-2. **Kịch bản 2 (Chiếm quyền & Thừa kế ưu tiên):** Bài thử dàn dựng có chủ đích; kích hoạt ngắt phần cứng nhân tạo `Interrupt1_IRQn` ngay giữa 2 giai đoạn của RFFT (giữa `arm_cfft_f32` và `stage_rfft_f32`), kiểm tra tác vụ Alarm chiếm quyền Processing tức thì và cập nhật đầu ra trước khi FFT tiếp tục. Phần B là bài thử tranh chấp `xLogMutex` riêng biệt giữa Logging (2) và Processing (3) với sự can thiệp của Acquisition (4) để xác minh cơ chế Priority Inheritance của FreeRTOS.
-3. **Kịch bản 3 (Quá tải & Giới hạn tài nguyên):** Nhịp tạo khối tăng vọt từ 64 ms lên 4 ms burst mode, Processing giả lập độ trễ 6 tick (`vTaskDelay`) và log mọi khối để tạo nghẽn hàng đợi/buffer (Drop-Oldest và DMA overrun). Đây là hiện tượng nghẽn hàng đợi và bộ đệm, không phải nghẽn do quá tải tính toán CPU.
+1. Cửa sổ 2000 ms, hai khối bất thường #6/#14 và kiểm tra luồng dữ liệu.
+2. Bài thử dàn dựng: ngắt treo chủ đích (`NVIC_SetPendingIRQ(Interrupt1_IRQn)`) giữa hai giai đoạn FFT, kiểm tra Alarm chạy trước khi FFT trở lại, đồng thời kiểm tra RMS/bin sau tiếp tục; mutex là bài thử chuyên biệt với trình tự Logging 2→3→2.
+3. Nhịp yêu cầu 64→4 ms (16 lần), Processing chờ 6 tick và log mỗi khối để tạo nghẽn có chủ đích. Hiện tượng quá tải quan sát được ở đây là **nghẽn queue và buffer**, hoàn toàn **không phải nghẽn CPU** (thời gian xử lý FFT + đặc trưng trên CPU < 1 ms).
 
-## Phạm vi kết quả & Tuyên bố kỹ thuật
+## Đo thời gian bằng SysTick Tick (1 ms)
 
-- Dùng **results/reconciled/** làm nguồn kết quả. Dùng `verify_reconciled.py` để chạy QEMU và kiểm tra log UART độc lập.
-- **Không quy đổi số chu kỳ QEMU thành số đo phần cứng STM32N657X0:** Mọi số liệu chu kỳ hay thời gian (nếu có trên môi trường hỗ trợ) đều là số chu kỳ mô phỏng trên QEMU MPS3 AN547, không đại diện cho thời gian thực thi trên phần cứng STM32N657X0 thật.
-- Không khôi phục bộ đo SysTick cũ (`get_system_cycles`, TRACE buffer, TASK_METRIC, `vTaskGetRunTimeStats`).
-- Cảnh báo cập nhật biến đầu ra mô phỏng (`g_alarm_output_state = 0x07`), không điều khiển chân GPIO STM32 vật lý.
-- Ngưỡng phổ dùng biên độ một phía chuẩn hóa; peak là `max(abs(sample))`. Heap_5 dùng một vùng tĩnh 64 KiB trong SRAM.
+Hệ thống sử dụng số tick FreeRTOS `xTaskGetTickCount()` làm nguồn đo thời gian thực nghiệm:
+- **Tần số tick & Sai số lượng tử hóa:** FreeRTOS cấu hình nhịp tick danh định 1.000 Hz (**1 tick = 1 ms**). Mọi mốc thời gian được lượng tử hóa về mili giây nguyên, do đó **mọi khoảng thời gian tính bằng hiệu hai mốc đều có sai số tối đa ±1 ms**.
+- **Môi trường giả lập:** Toàn bộ số đo là **số tick trên mô phỏng QEMU MPS3 AN547, không phải số đo trên phần cứng vật lý STM32N657X0**. Không trình bày giới hạn thô mili giây như số đo micro giây.
+- **Độ trễ cảnh báo Kịch bản 2:** Đo qua hiệu `t_output - t_irq_pend` (`latency_ticks`, quan sát được 0–1 tick), cho giới hạn trên thô `latency_bound_ms = latency_ticks + 1` (< 1–2 ms). Đây chỉ là **giới hạn trên thô theo độ phân giải tick 1 ms**, **chưa xác nhận định lượng ở cấp micro giây**.
+- **Mốc thời gian từng khối và Kịch bản 3:**
+  - `t_gen`: Mốc thời gian khi Thu thập lấy khối khỏi double-buffer (`desc.timestamp_ms`).
+  - `t_start`: Mốc khi Xử lý lấy mô tả khối từ `xBlockQueue`.
+  - `t_end`: Mốc khi Xử lý hoàn tất tính toán FFT, trích xuất đặc trưng và đưa log vào queue — **được lấy TRƯỚC `vTaskDelay(6)` của Kịch bản 3**. Do đó, `resp = t_end - t_gen` **không bao gồm 6 ms delay nhân tạo**, và số khối trễ hạn 64 ms (`deadline_miss`) được đánh giá dựa trên thời gian xử lý thực sự này.
+  - Toàn bộ mốc thời gian của từng khối được xả ra UART sau khi Kịch bản 3 hoàn tất dưới dạng: `[BLOCK_T] seq=<n> sc=<1|2|3> gen=<tick> start=<tick> end=<tick>`.
+
+## Phạm vi kết quả
+
+Dùng **results/reconciled/** làm nguồn kết quả mới. Những báo cáo và hình ở results/ gốc là bằng chứng của bản cũ, không dùng cho bản báo cáo đã sửa. Các script generate_reports.py/plot_figures.py cũ không dùng để sinh lại kết quả mới.
+
+Bản mới kiểm tra chức năng, số đếm và HWM; không xuất CPU%, RTA, WCET hoặc độ trễ micro giây từ bộ đếm SysTick cũ. Mục tiêu 10 ms vẫn là yêu cầu chưa xác nhận định lượng. Tickless bật nhưng chưa thử điện năng. Cảnh báo cập nhật biến đầu ra mô phỏng, không điều khiển GPIO STM32 thật. Ngưỡng phổ dùng biên độ một phía chuẩn hóa; peak là max(abs(sample)).
+
+Heap_5 hiện dùng một vùng 64 KiB, không mặc định cần nhiều vùng. Cấp phát stack/TCB tĩnh nằm ngoài heap. Không suy ra không rò rỉ hoặc an toàn tuyệt đối từ một lần chạy. Thư viện CMSIS-DSP 1.10.0 đi cùng gói CMSIS 5.9.0; nguồn có hook FFT phục vụ kiểm thử.
