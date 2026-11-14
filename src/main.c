@@ -50,6 +50,19 @@
 #define SYSTEM_CLOCK_FREQ_HZ        32000000UL
 #define SYSTICK_RELOAD_CYCLES       (SYSTEM_CLOCK_FREQ_HZ / configTICK_RATE_HZ) /* nominal 32,000 clock ticks per RTOS tick */
 
+/* DWT CYCCNT Reader (Chapter III & Task-dwt) */
+static inline uint32_t dwt_cycles(void)
+{
+    return DWT->CYCCNT;
+}
+
+static void dwt_init(void)
+{
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+    DWT->CYCCNT = 0;
+}
+
 /*----------------------------------------------------------------------------
  * Type Definitions (Conforming strictly to Chapter III §2.2 & Task-round2)
  *----------------------------------------------------------------------------*/
@@ -59,6 +72,7 @@ typedef struct {
     const int16_t *pData;       /* Pointer to 512 int16 samples in DTCM double buffer */
     uint32_t block_seq;         /* Block sequence number */
     uint32_t timestamp_ms;      /* Timestamp when block was acquired */
+    uint32_t t_gen;             /* CYCCNT timestamp when block was generated */
     uint8_t anomaly_type;       /* 0=None, 1=Bearing fault harmonic, 2=Severe imbalance */
     uint8_t overrun_flag;       /* 1 if buffer overrun occurred */
 } BlockDescriptor_t;
@@ -107,6 +121,29 @@ static volatile uint32_t g_test_alarm_count = 0;
 static volatile bool g_s2_fft_active = false;
 static volatile bool g_s2_irq_seen = false;
 static volatile bool g_s2_alarm_during_fft = false;
+
+/* Scenario 2 Timing Timestamps (DWT CYCCNT) */
+static volatile uint32_t g_t_fft1_start  = 0;
+static volatile uint32_t g_t_fft1_end    = 0;
+static volatile uint32_t g_t_irq_pend    = 0;
+static volatile uint32_t g_t_alarm_start = 0;
+static volatile uint32_t g_t_alarm_end   = 0;
+static volatile uint32_t g_t_fft2_start  = 0;
+static volatile uint32_t g_t_fft2_end    = 0;
+static volatile uint32_t g_t_block       = 0;
+static volatile uint32_t g_t_acquire     = 0;
+
+/* Scenario 3 Timing Aggregation (DWT CYCCNT) */
+static volatile uint32_t g_s3_blocks_processed = 0;
+static volatile uint32_t g_s3_max_wait_cycles  = 0;
+static volatile uint64_t g_s3_sum_wait_cycles  = 0;
+static volatile uint32_t g_s3_max_resp_cycles  = 0;
+static volatile uint64_t g_s3_sum_resp_cycles  = 0;
+static volatile uint32_t g_s3_max_cpu_cycles   = 0;
+static volatile uint64_t g_s3_sum_cpu_cycles   = 0;
+static volatile uint32_t g_s3_deadline_miss    = 0;
+static volatile uint32_t g_s3_t_first_gen      = 0;
+static volatile uint32_t g_s3_t_last_end       = 0;
 
 /* Safe atomic statistics update macros */
 #define STATS_INC(field) do { \
@@ -367,8 +404,11 @@ void rfft_mid_stage_hook(void)
 {
     if (g_s2_preempt_armed) {
         g_s2_preempt_armed = false;
+        g_t_fft1_end = dwt_cycles();
+        g_t_irq_pend = dwt_cycles();
         /* Trigger hardware interrupt Interrupt1_IRQn right in the middle of FFT */
         NVIC_SetPendingIRQ(Interrupt1_IRQn);
+        g_t_fft2_start = dwt_cycles();
     }
 }
 
@@ -458,9 +498,13 @@ static void vTaskAlarm(void *pvParameters)
     uint32_t notified_code;
     while (1) {
         if (xTaskNotifyWait(0, ULONG_MAX, &notified_code, portMAX_DELAY) == pdPASS) {
+            uint32_t t_al_start = dwt_cycles();
             g_alarm_output_state = 0x07; /* simulated buzzer, LED and relay outputs */
+            uint32_t t_al_end = dwt_cycles();
             STATS_INC(alarm_actuate_count);
             if (g_current_scenario == 2 && g_s2_fft_active && g_s2_irq_seen) {
+                g_t_alarm_start = t_al_start;
+                g_t_alarm_end   = t_al_end;
                 g_s2_alarm_during_fft = true;
                 g_test_alarm_count++;
             }
@@ -490,6 +534,7 @@ static void vTaskAcquisition(void *pvParameters)
             desc.pData          = g_DoubleBuffer[read_buf];
             desc.block_seq      = current_seq;
             desc.timestamp_ms   = tick_now;
+            desc.t_gen          = dwt_cycles();
             desc.overrun_flag   = g_buf_overrun[read_buf];
 
             if (g_current_scenario == 1) {
@@ -539,6 +584,9 @@ static void vTaskProcessing(void *pvParameters)
     while (1) {
         /* Wait for block descriptor from Acquisition Task */
         if (xQueueReceive(xBlockQueue, &desc, portMAX_DELAY) == pdPASS) {
+            uint32_t t_start = dwt_cycles();
+            uint32_t t_proc_start = dwt_cycles();
+
             /* 1. Input Conversion: int16 (1.0g = 1000 LSB) -> float32 (g) */
             const float32_t scale = 1.0f / 1000.0f;
             for (int i = 0; i < BLOCK_SIZE; i += 4) {
@@ -565,10 +613,15 @@ static void vTaskProcessing(void *pvParameters)
             if (g_current_scenario == 2 && !g_s2_preempt_verified) {
                 g_s2_preempt_armed = true;
                 g_s2_fft_active = true;
+                g_t_fft1_start = dwt_cycles();
             }
 
             /* Execute RFFT. If armed, rfft_mid_stage_hook() triggers Interrupt 1 mid-computation */
             arm_rfft_fast_f32(&g_rfft_instance, g_FFT_Input, g_FFT_Output, 0);
+
+            if (g_current_scenario == 2 && g_s2_fft_active) {
+                g_t_fft2_end = dwt_cycles();
+            }
 
             bool verify_preemption = g_s2_fft_active;
             g_s2_fft_active = false;
@@ -589,6 +642,8 @@ static void vTaskProcessing(void *pvParameters)
             /* Feature F: Sub-band Energy (Fault Band: 200 Hz - 600 Hz, Bins 13..38) */
             float32_t band_energy = 0.0f;
             arm_power_f32(&g_Mag_Spectrum[13], 26, &band_energy);
+
+            uint32_t t_proc_end = dwt_cycles();
 
             if (verify_preemption) {
                 g_s2_preempt_verified = g_s2_irq_seen && g_s2_alarm_during_fft &&
@@ -612,6 +667,32 @@ static void vTaskProcessing(void *pvParameters)
             g_buf_busy[released_buf] = 0;
             g_buf_overrun[released_buf] = 0; /* Reset overrun flag on release */
             STATS_INC(processed_blocks);
+            uint32_t t_end = dwt_cycles();
+
+            if (g_current_scenario == 3) {
+                if (g_s3_blocks_processed == 0) {
+                    g_s3_t_first_gen = desc.t_gen;
+                }
+                g_s3_t_last_end = t_end;
+                g_s3_blocks_processed++;
+
+                uint32_t wait_c = t_start - desc.t_gen;
+                uint32_t cpu_c  = t_proc_end - t_proc_start;
+                uint32_t resp_c = t_end - desc.t_gen;
+
+                if (wait_c > g_s3_max_wait_cycles) g_s3_max_wait_cycles = wait_c;
+                g_s3_sum_wait_cycles += wait_c;
+
+                if (cpu_c > g_s3_max_cpu_cycles) g_s3_max_cpu_cycles = cpu_c;
+                g_s3_sum_cpu_cycles += cpu_c;
+
+                if (resp_c > g_s3_max_resp_cycles) g_s3_max_resp_cycles = resp_c;
+                g_s3_sum_resp_cycles += resp_c;
+
+                if (resp_c > 2048000UL) {
+                    g_s3_deadline_miss++;
+                }
+            }
 
             /* 5. Threshold Classification & Anomaly Decision */
             uint8_t alarm_level = 0;
@@ -690,7 +771,9 @@ static void vTaskProcessing(void *pvParameters)
                 if (xSemaphoreTake(xInheritSignalSem, portMAX_DELAY) == pdPASS) {
                     /* Processing (Pri 3) attempts to acquire xLogMutex held by Logging (Pri 2) -> BLOCKS!
                      * FreeRTOS kernel automatically raises Logging's priority to 3! */
+                    g_t_block = dwt_cycles();
                     if (xSemaphoreTake(xLogMutex, portMAX_DELAY) == pdPASS) {
+                        g_t_acquire = dwt_cycles();
                         /* Acquired after Logging releases xLogMutex */
                         xSemaphoreGive(xLogMutex);
                         if (xInheritDoneSem != NULL) {
@@ -928,6 +1011,26 @@ static void vScenarioTimerCallback(TimerHandle_t xTimer)
     else if (g_current_scenario == 2 && g_s2_preempt_verified && g_s2_inheritance_verified) {
         bool s2_pass = g_s2_preempt_verified && g_s2_inheritance_verified;
         g_s2_passed = s2_pass;
+
+        uint32_t alarm_latency_cycles = g_t_alarm_end - g_t_irq_pend;
+        uint32_t alarm_latency_us     = alarm_latency_cycles / 32;
+        uint32_t fft_cycles           = (g_t_fft1_end - g_t_fft1_start) + (g_t_fft2_end - g_t_fft2_start);
+        uint32_t fft_us               = fft_cycles / 32;
+        uint32_t alarm_exec_cycles    = g_t_alarm_end - g_t_alarm_start;
+        uint32_t alarm_exec_us        = alarm_exec_cycles / 32;
+        uint32_t mutex_block_cycles   = g_t_acquire - g_t_block;
+        uint32_t mutex_block_us       = mutex_block_cycles / 32;
+
+        uart_puts("[S2_TIMING] alarm_latency_cycles="); uart_print_uint(alarm_latency_cycles);
+        uart_puts(" alarm_latency_us="); uart_print_uint(alarm_latency_us);
+        uart_puts(" fft_cycles="); uart_print_uint(fft_cycles);
+        uart_puts(" fft_us="); uart_print_uint(fft_us);
+        uart_puts(" alarm_exec_cycles="); uart_print_uint(alarm_exec_cycles);
+        uart_puts(" alarm_exec_us="); uart_print_uint(alarm_exec_us);
+        uart_puts(" mutex_block_cycles="); uart_print_uint(mutex_block_cycles);
+        uart_puts(" mutex_block_us="); uart_print_uint(mutex_block_us);
+        uart_puts("\r\n");
+
         if (s2_pass) {
             uart_puts("\r\n>>> KICH BAN 2 HOAN THANH: [PASS] [ok]\r\n");
         } else {
@@ -985,6 +1088,31 @@ static void vScenarioTimerCallback(TimerHandle_t xTimer)
                        !g_buf_busy[0] && !g_buf_busy[1] &&
                        uxQueueMessagesWaiting(xBlockQueue) == 0;
         g_s3_passed = s3_pass;
+
+        uint32_t s3_blocks = g_s3_blocks_processed;
+        uint32_t max_wait_us  = g_s3_max_wait_cycles / 32;
+        uint32_t mean_wait_us = s3_blocks ? (uint32_t)((g_s3_sum_wait_cycles / s3_blocks) / 32) : 0;
+        uint32_t max_resp_us  = g_s3_max_resp_cycles / 32;
+        uint32_t mean_resp_us = s3_blocks ? (uint32_t)((g_s3_sum_resp_cycles / s3_blocks) / 32) : 0;
+        uint32_t max_cpu_us   = g_s3_max_cpu_cycles / 32;
+        uint32_t mean_cpu_us  = s3_blocks ? (uint32_t)((g_s3_sum_cpu_cycles / s3_blocks) / 32) : 0;
+        uint32_t total_s3_cycles = g_s3_t_last_end - g_s3_t_first_gen;
+        float throughput_bps = 0.0f;
+        if (total_s3_cycles > 0) {
+            float total_s3_sec = (float)total_s3_cycles / 32000000.0f;
+            throughput_bps = (float)s3_blocks / total_s3_sec;
+        }
+
+        uart_puts("[S3_TIMING] blocks="); uart_print_uint(s3_blocks);
+        uart_puts(" max_wait_us="); uart_print_uint(max_wait_us);
+        uart_puts(" mean_wait_us="); uart_print_uint(mean_wait_us);
+        uart_puts(" max_resp_us="); uart_print_uint(max_resp_us);
+        uart_puts(" mean_resp_us="); uart_print_uint(mean_resp_us);
+        uart_puts(" deadline_miss="); uart_print_uint(g_s3_deadline_miss);
+        uart_puts(" max_cpu_us="); uart_print_uint(max_cpu_us);
+        uart_puts(" mean_cpu_us="); uart_print_uint(mean_cpu_us);
+        uart_puts(" throughput_bps="); uart_print_float(throughput_bps, 2);
+        uart_puts("\r\n");
 
         if (s3_pass) {
             uart_puts("\r\n>>> KICH BAN 3 HOAN THANH: [PASS] [ok] (Log drop va Overrun da duoc ghi nhan, 0 log canh bao bi mat)\r\n");
@@ -1191,6 +1319,78 @@ static void init_dtcm_memory(void)
     }
 }
 
+/* DWT CYCCNT Verification */
+static bool check_dwt_monotonic(void)
+{
+    uint32_t prev = dwt_cycles();
+    uint32_t decreases = 0;
+    for (int i = 0; i < 9999; i++) {
+        uint32_t cur = dwt_cycles();
+        if (cur < prev) {
+            decreases++;
+        }
+        prev = cur;
+    }
+    uart_puts("[DWT_CHECK] monotonic reads=10000 decreases=");
+    uart_print_uint(decreases);
+    uart_puts("\r\n");
+    return (decreases == 0);
+}
+
+static StackType_t xDwtCheckStack[configMINIMAL_STACK_SIZE] __attribute__((section(".bss"), aligned(8)));
+static StaticTask_t xDwtCheckTCB                            __attribute__((section(".bss"), aligned(8)));
+
+static void vTaskDwtCheck(void *pvParameters)
+{
+    (void)pvParameters;
+
+    bool mono_ok = check_dwt_monotonic();
+
+    TickType_t t_start = xTaskGetTickCount();
+    while (xTaskGetTickCount() == t_start) {
+        /* align to start of next tick */
+    }
+    t_start = xTaskGetTickCount();
+    uint32_t c_start = dwt_cycles();
+
+    while (xTaskGetTickCount() < t_start + 100) {
+        /* wait 100 ticks (100 ms) */
+    }
+    uint32_t c_end = dwt_cycles();
+    uint32_t actual = c_end - c_start;
+
+    bool within_tol = (actual >= 3168000UL && actual <= 3232000UL);
+    bool cyccnt_increasing = (actual > 0);
+
+    uart_puts("[DWT_CHECK] calib ticks=100 expected=3200000 actual=");
+    uart_print_uint(actual);
+    uart_puts(" within_tolerance=");
+    uart_puts(within_tol ? "true\r\n" : "false\r\n");
+
+    if (!mono_ok) {
+        uart_puts("[DWT_CHECK] FAIL monotonic check failed (decreases > 0)\r\n");
+        qemu_exit(5);
+    }
+    if (!cyccnt_increasing) {
+        uart_puts("[DWT_CHECK] FAIL CYCCNT is not incrementing (actual=0, QEMU does not implement DWT CYCCNT)\r\n");
+        qemu_exit(5);
+    }
+    if (!within_tol) {
+        uart_puts("[DWT_CHECK] FAIL calibration out of tolerance\r\n");
+        qemu_exit(5);
+    }
+
+    uart_puts("[DWT_CHECK] DWT CYCCNT verification PASSED [ok]\r\n");
+    uart_puts("\r\n====================================================================\r\n");
+    uart_puts(">>> BAT DAU KICH BAN 1: HOAT DONG BINH THUONG VA PHAT HIEN ANOMALY <<<\r\n");
+    uart_puts("    (Cua so 2000 ms; 8 kHz logic, 64 ms/khoi. Chen loi tai Khoi #6 va #14)\r\n");
+    uart_puts("====================================================================\r\n");
+    xTimerStart(xDmaTimer, 0);
+    xTimerStart(xScenarioTimer, 0);
+
+    vTaskDelete(NULL);
+}
+
 /*----------------------------------------------------------------------------
  * Application Entry Point (main)
  *----------------------------------------------------------------------------*/
@@ -1199,6 +1399,9 @@ int main(void)
     /* 1. Initialize Hardware UART & DTCM */
     uart_init();
     init_dtcm_memory();
+
+    /* Initialize DWT CYCCNT */
+    dwt_init();
 
     uart_puts("\r\n====================================================================\r\n");
     uart_puts("   HE THONG GIAM SAT RUNG DONG & CANH BAO BAT THUONG (FreeRTOS)    \r\n");
@@ -1261,14 +1464,13 @@ int main(void)
     );
     configASSERT(xTaskLogHandle != NULL);
 
-    /* 6. Create Software Timers */
+    /* 6. Create Software Timers (Started by vTaskDwtCheck after DWT verification) */
     /* DMA Timer: triggers Interrupt0 every 64 ms */
     static StaticTimer_t xDmaTimerBuffer;
     xDmaTimer = xTimerCreateStatic(
         "xDmaTimer", pdMS_TO_TICKS(64), pdTRUE, NULL, vDmaTimerCallback, &xDmaTimerBuffer
     );
     configASSERT(xDmaTimer != NULL);
-    xTimerStart(xDmaTimer, 0);
 
     /* Scenario State Machine Timer: manages transitions every 100 ms */
     static StaticTimer_t xScenarioTimerBuffer;
@@ -1276,9 +1478,14 @@ int main(void)
         "xScenarioTimer", pdMS_TO_TICKS(100), pdTRUE, NULL, vScenarioTimerCallback, &xScenarioTimerBuffer
     );
     configASSERT(xScenarioTimer != NULL);
-    xTimerStart(xScenarioTimer, 0);
 
-    /* 7. Configure NVIC for Stub Interrupts */
+    /* 7. Create DWT Verification Task (Priority 5 - highest priority, runs before application tasks) */
+    TaskHandle_t xDwtCheckHandle = xTaskCreateStatic(
+        vTaskDwtCheck, "vTaskDwtCheck", configMINIMAL_STACK_SIZE, NULL, 5, xDwtCheckStack, &xDwtCheckTCB
+    );
+    configASSERT(xDwtCheckHandle != NULL);
+
+    /* 8. Configure NVIC for Stub Interrupts */
     NVIC_SetPriority(Interrupt0_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY);
     NVIC_EnableIRQ(Interrupt0_IRQn);
 
@@ -1286,12 +1493,8 @@ int main(void)
     NVIC_EnableIRQ(Interrupt1_IRQn);
 
     uart_puts("[Kernel] Starting FreeRTOS Scheduler with 4 Tasks + Idle (Tick = 1000 Hz)...\r\n");
-    uart_puts("\r\n====================================================================\r\n");
-    uart_puts(">>> BAT DAU KICH BAN 1: HOAT DONG BINH THUONG VA PHAT HIEN ANOMALY <<<\r\n");
-    uart_puts("    (Cua so 2000 ms; 8 kHz logic, 64 ms/khoi. Chen loi tai Khoi #6 va #14)\r\n");
-    uart_puts("====================================================================\r\n");
 
-    /* 8. Start the Scheduler */
+    /* 9. Start the Scheduler */
     vTaskStartScheduler();
 
     while (1) {}

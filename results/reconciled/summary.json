@@ -1,7 +1,7 @@
 {
-  "qemu_version": "QEMU emulator version 11.1.0 (v11.1.0-12130-ge470268ff4)",
+  "qemu_version": "QEMU emulator version 11.0.1",
   "command": [
-    "R:\\.task-tools\\qemu\\qemu-system-arm.exe",
+    "C:\\msys64\\ucrt64\\bin\\qemu-system-arm.EXE",
     "-machine",
     "mps3-an547",
     "-cpu",
@@ -16,157 +16,41 @@
     "-kernel",
     "build/firmware.elf"
   ],
-  "returncode": 0,
-  "elf_sha256": "be021fd01506f3340c21b717df30da12d668d2d15be25fe13bdec9b12d47369a",
-  "source_sha256": "4ac3890b31f388994df3ce048896d7634e9888933bf3d1c20910994c379d7d5c",
-  "baseline_commit": "90ce744a7fcad53d3b1c1f78b96659fbff20b3de",
-  "counts": {
-    "0": {
-      "generated_blocks": 357,
-      "processed_blocks": 235,
-      "isr_overrun_count": 122,
-      "queue_dropped_blocks": 0,
-      "alarm_actuate_count": 4,
-      "normal_logs_generated": 203,
-      "normal_logs_written": 19,
-      "normal_logs_dropped": 184,
-      "alarm_logs_generated": 3,
-      "alarm_logs_written": 3,
-      "alarm_logs_dropped": 0
+  "returncode": 1,
+  "elf_sha256": "59845cae8c4f37658060d89a3e6af6b46ad41f90ae374d3600bb4df816d5face",
+  "source_sha256": "2345c249426f8f12b4be6fa215ee75ea684963c0d115dc473413c0668b545aec",
+  "baseline_commit": "ef5c6946e01ed4cffdaeca5f9576797af304ee1f",
+  "counts": {},
+  "stacks": [],
+  "heap": null,
+  "timing": {
+    "dwt_check": {
+      "present": true,
+      "monotonic_reads": 10000,
+      "monotonic_decreases": 0,
+      "calib_ticks": 100,
+      "expected_cycles": 3200000,
+      "actual_cycles": 0,
+      "within_tolerance": false,
+      "passed": false,
+      "fail_reason": "CYCCNT is not incrementing (actual=0, QEMU does not implement DWT CYCCNT)"
     },
-    "1": {
-      "generated_blocks": 31,
-      "processed_blocks": 31,
-      "isr_overrun_count": 0,
-      "queue_dropped_blocks": 0,
-      "alarm_actuate_count": 2,
-      "normal_logs_generated": 1,
-      "normal_logs_written": 1,
-      "normal_logs_dropped": 0,
-      "alarm_logs_generated": 2,
-      "alarm_logs_written": 2,
-      "alarm_logs_dropped": 0
-    },
-    "2": {
-      "generated_blocks": 2,
-      "processed_blocks": 2,
-      "isr_overrun_count": 0,
-      "queue_dropped_blocks": 0,
-      "alarm_actuate_count": 1,
-      "normal_logs_generated": 1,
-      "normal_logs_written": 1,
-      "normal_logs_dropped": 0,
-      "alarm_logs_generated": 0,
-      "alarm_logs_written": 0,
-      "alarm_logs_dropped": 0
-    },
-    "3": {
-      "generated_blocks": 324,
-      "processed_blocks": 202,
-      "isr_overrun_count": 122,
-      "queue_dropped_blocks": 0,
-      "alarm_actuate_count": 1,
-      "normal_logs_generated": 201,
-      "normal_logs_written": 17,
-      "normal_logs_dropped": 184,
-      "alarm_logs_generated": 1,
-      "alarm_logs_written": 1,
-      "alarm_logs_dropped": 0
-    }
-  },
-  "stacks": [
-    {
-      "task": "Alarm",
-      "alloc": 1024,
-      "free": 868,
-      "used": 156
-    },
-    {
-      "task": "Acquisition",
-      "alloc": 1024,
-      "free": 840,
-      "used": 184
-    },
-    {
-      "task": "Processing",
-      "alloc": 4096,
-      "free": 3504,
-      "used": 592
-    },
-    {
-      "task": "Logging",
-      "alloc": 2048,
-      "free": 1704,
-      "used": 344
-    },
-    {
-      "task": "Idle",
-      "alloc": 512,
-      "free": 352,
-      "used": 160
-    },
-    {
-      "task": "TmrSvc",
-      "alloc": 1024,
-      "free": 704,
-      "used": 320
-    }
-  ],
-  "heap": {
-    "total": 65536,
-    "free": 64368,
-    "minimum_free": 64368
+    "scenario2": null,
+    "scenario3": null
   },
   "checks": {
-    "process_exit_zero": true,
+    "process_exit_zero": false,
     "no_fail_marker": true,
     "golden_four_pass": true,
-    "three_scenarios_complete": true,
-    "fft_preemption_and_resume": true,
-    "priority_inheritance": true,
-    "stack_six_tasks": true,
-    "blocks_conserved_0": true,
-    "normal_logs_conserved_0": true,
-    "alarm_logs_conserved_0": true,
-    "blocks_conserved_1": true,
-    "normal_logs_conserved_1": true,
-    "alarm_logs_conserved_1": true,
-    "blocks_conserved_2": true,
-    "normal_logs_conserved_2": true,
-    "alarm_logs_conserved_2": true,
-    "blocks_conserved_3": true,
-    "normal_logs_conserved_3": true,
-    "alarm_logs_conserved_3": true,
-    "phase_totals_match": true,
-    "scenario1_correct_detection": true,
-    "scenario3_overload_observed": true,
-    "uart_records_match_written": true
+    "three_scenarios_complete": false,
+    "fft_preemption_and_resume": false,
+    "priority_inheritance": false,
+    "stack_six_tasks": false,
+    "dwt_monotonic_pass": true,
+    "dwt_calib_pass": false,
+    "dwt_check_passed": false,
+    "all_counter_rows_present": false
   },
-  "all_passed": true,
-  "scope": "Functional behavior and observed memory only; no quantitative timing or physical STM32 claims.",
-  "compiler_version": "arm-none-eabi-gcc.exe (xPack GNU Arm Embedded GCC x86_64) 13.3.1 20240614",
-  "sections": {
-    ".text": 145972,
-    ".ARM.exidx": 8,
-    ".copy.table": 24,
-    ".zero.table": 16,
-    ".dtcm_data": 0,
-    ".dtcm_bss": 12672,
-    ".data": 43740,
-    ".bss": 70872,
-    ".heap": 16384,
-    ".stack": 8192,
-    ".ARM.attributes": 58,
-    ".comment": 57,
-    ".debug_info": 98184,
-    ".debug_abbrev": 13198,
-    ".debug_loclists": 47621,
-    ".debug_aranges": 2304,
-    ".debug_rnglists": 6023,
-    ".debug_macro": 66897,
-    ".debug_line": 70720,
-    ".debug_str": 849116,
-    ".debug_frame": 7812
-  },
-  "load_image_bytes": 189760
+  "all_passed": false,
+  "scope": "Functional behavior and observed memory only; no quantitative timing or physical STM32 claims."
 }
